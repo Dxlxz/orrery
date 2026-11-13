@@ -1,0 +1,6 @@
+namespace com.orrery.test.testing
+
+/**
+ * For unit testing
+ */
+typeref RelationshipUnion = union[RelationshipFoo, RelationshipBar]

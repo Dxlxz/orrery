@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Orrery ingestion source
+ */
+@Aspect = {
+  "name": "orreryIngestionSourceKey"
+}
+record OrreryIngestionSourceKey {
+  /**
+   * A unique id for the Ingestion Source, either generated or provided
+   */
+  id: string
+}

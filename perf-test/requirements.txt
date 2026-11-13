@@ -1,0 +1,2 @@
+locust-plugins
+-e ../metadata-ingestion[orrery-rest,orrery-kafka]

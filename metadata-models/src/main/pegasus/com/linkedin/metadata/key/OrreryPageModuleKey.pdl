@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a OrreryPageModule
+ */
+@Aspect = {
+  "name": "orreryPageModuleKey",
+}
+record OrreryPageModuleKey {
+  /**
+  * Unique id for the module.
+  */
+  id: string
+}

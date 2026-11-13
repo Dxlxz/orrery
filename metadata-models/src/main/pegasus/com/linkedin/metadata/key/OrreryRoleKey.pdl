@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Orrery Role
+ */
+@Aspect = {
+  "name": "orreryRoleKey"
+}
+record OrreryRoleKey {
+  /**
+   * A unique id for the Orrery role record. Generated on the server side at role creation time.
+   */
+  id: string
+}

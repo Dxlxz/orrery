@@ -1,0 +1,34 @@
+- entity: "orreryExecutionRequest"
+  aspect: "orreryExecutionRequestResult"
+  forceOverwrite: true
+  config:
+    retention:
+      version:
+        maxVersions: 1
+- entity: "orreryRemoteExecutor"
+  aspect: "orreryRemoteExecutorStatus"
+  forceOverwrite: true
+  config:
+    retention:
+      version:
+        maxVersions: 1
+- entity: "orreryAction"
+  aspect: "orreryActionStatus"
+  forceOverwrite: true
+  config:
+    retention:
+      version:
+        maxVersions: 1
+- entity: "actionRequest"
+  aspect: "actionRequestStatus"
+  forceOverwrite: true
+  config:
+    retention:
+      version:
+        maxVersions: 1
+- entity: "*"
+  aspect: "*"
+  config:
+    retention:
+      version:
+        maxVersions: 20

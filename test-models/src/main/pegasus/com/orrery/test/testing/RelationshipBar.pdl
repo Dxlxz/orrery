@@ -1,0 +1,25 @@
+namespace com.orrery.test.testing
+
+import com.linkedin.common.Urn
+
+/**
+ * For unit tests
+ */
+@Aspect = {
+  "name": "relationshipBar"
+}
+record RelationshipBar {
+
+  /**
+   * For unit tests
+   */
+  source: Urn
+
+  /**
+   * For unit tests
+   */
+  @Relationship = {
+    "name": "RelationshipBar"
+  }
+  destination: Urn
+}

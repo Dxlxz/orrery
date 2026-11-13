@@ -1,0 +1,5 @@
+namespace com.orrery.test.invalid
+
+record MissingAspectAnnotation {
+  textField: optional string
+}

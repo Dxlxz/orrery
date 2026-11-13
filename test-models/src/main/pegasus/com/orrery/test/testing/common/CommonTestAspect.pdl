@@ -1,0 +1,7 @@
+namespace com.orrery.test.testing.common
+
+/**
+ * For unit tests
+ */
+record CommonTestAspect {
+}

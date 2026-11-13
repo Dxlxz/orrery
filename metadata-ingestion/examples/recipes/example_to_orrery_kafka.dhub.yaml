@@ -1,0 +1,13 @@
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/file for complete documentation
+source:
+  type: "file"
+  config:
+    filename: "./examples/mce_files/bootstrap_mce.json"
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-kafka"
+  config:
+    connection:
+      bootstrap: localhost:9092
+      schema_registry_url: http://localhost:8081

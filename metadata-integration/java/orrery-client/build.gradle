@@ -1,0 +1,300 @@
+plugins {
+  id("com.palantir.git-version") apply false
+  id 'java-library'
+  id 'com.gradleup.shadow'
+  id 'signing'
+  id 'io.codearte.nexus-staging'
+  id 'maven-publish'
+}
+
+apply from: "../../../gradle/coverage/java-coverage.gradle"
+apply from: "../versioning.gradle"
+import org.apache.tools.ant.filters.ReplaceTokens
+
+// Pin Java 17 bytecode: bundled into the orrery-spark-lineage agent shadow jar, which must run on
+// managed Spark whose default JVM is Java 17 (Amazon EMR 7.x, Databricks Runtime 16-17).
+ext.javaClassVersionOverride = 17
+
+
+jar {
+  if (project.hasProperty('archiveAppendix')) {
+    archiveAppendix.set(project.archiveAppendix)
+  }
+  archiveClassifier = "lib"
+}
+
+dependencies {
+  api project(':entity-registry')
+  api project(':metadata-integration:java:orrery-event')
+  implementation project(':metadata-integration:java:orrery-schematron:lib')
+
+  implementation(externalDependency.kafkaAvroSerializer) {
+    exclude group: "org.apache.avro"
+  }
+  implementation externalDependency.avro
+  implementation externalDependency.httpClient
+
+  constraints {
+    implementation('commons-collections:commons-collections:3.2.2') {
+      because 'Vulnerability Issue'
+    }
+  }
+
+  implementation externalDependency.awsS3
+  implementation platform(externalDependency.jacksonBom)
+  implementation externalDependency.jacksonDataBind
+  runtimeOnly externalDependency.jna
+
+  api externalDependency.slf4jApi
+  compileOnly externalDependency.lombok
+  annotationProcessor externalDependency.lombok
+  // VisibleForTesting
+  compileOnly externalDependency.guava
+  testImplementation externalDependency.testng
+  // test task uses useJUnit(): declare JUnit 4 directly instead of relying on a transitive copy
+  testImplementation externalDependency.junit
+  testImplementation externalDependency.mockito
+  testImplementation externalDependency.mockServer
+  testImplementation externalDependency.mockServerClient
+  testImplementation externalDependency.testContainers
+  testRuntimeOnly externalDependency.logbackClassic
+  // ASM for bytecode inspection in tests
+  testImplementation 'org.ow2.asm:asm:9.5'
+}
+
+task copyAvroSchemas {
+  onlyIf {
+    !gradle.startParameter.taskNames.any { it.contains('resolveAndLockAll') }
+  }
+  dependsOn(':metadata-events:mxe-schemas:renameNamespace')
+  copy {
+    from file('../../../metadata-events/mxe-schemas/src/renamed/avro/com/linkedin/mxe/MetadataChangeProposal.avsc')
+    into file('./src/main/resources')
+  }
+}
+
+compileJava.dependsOn copyAvroSchemas
+
+
+// Add Python environment validation task
+task validatePythonEnv(dependsOn: [":metadata-ingestion:installDev"]) {
+    doFirst {
+        def venvPath = System.getProperty('python.venv.path', '../../../metadata-ingestion/venv')
+        def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+        def pythonExe = isWindows ? "${venvPath}/Scripts/python.exe" : "${venvPath}/bin/python"
+
+        def result = execOps.exec {
+            commandLine pythonExe, "-c", "import sys; print(sys.executable)"
+            ignoreExitValue = true
+            standardOutput = new ByteArrayOutputStream()
+            errorOutput = new ByteArrayOutputStream()
+        }
+
+        if (result.exitValue != 0) {
+            throw new GradleException("Python virtual environment not properly set up at ${venvPath}")
+        }
+    }
+}
+
+test {
+  // to avoid simultaneous executions of tests when complete build is run
+  mustRunAfter(":metadata-io:test")
+  useJUnit()
+  // Add Python environment configuration
+  dependsOn validatePythonEnv
+  dependsOn tasks.getByPath(":metadata-ingestion:installDev")
+  systemProperty 'python.venv.path', System.getProperty('python.venv.path', '../../../metadata-ingestion/venv')
+
+  // Disable parallel test execution for integration tests
+  maxParallelForks = 1
+
+  // Pass Orrery integration test environment variables
+  if (System.getenv('ORRERY_SERVER')) {
+    environment 'ORRERY_SERVER', System.getenv('ORRERY_SERVER')
+  }
+  if (System.getenv('ORRERY_TOKEN')) {
+    environment 'ORRERY_TOKEN', System.getenv('ORRERY_TOKEN')
+  }
+  if (System.getenv('ADMIN_USERNAME')) {
+    environment 'ADMIN_USERNAME', System.getenv('ADMIN_USERNAME')
+  }
+  if (System.getenv('ADMIN_PASSWORD')) {
+    environment 'ADMIN_PASSWORD', System.getenv('ADMIN_PASSWORD')
+  }
+
+  // Integration tests are skipped by BaseIntegrationTest.assumeTrue() when ORRERY_SERVER is not set.
+  // This ensures regular builds are fast, while smoke tests (which set ORRERY_SERVER) run all tests.
+  finalizedBy jacocoTestReport
+}
+
+// no submodule depends on orrery-schematron:cli
+// and tests there are the ones checking python-java compatibility
+test.dependsOn tasks.getByPath(":metadata-integration:java:orrery-schematron:cli:test")
+test.dependsOn tasks.getByPath(":metadata-integration:java:orrery-schematron:lib:test")
+
+task checkShadowJar(type: Exec) {
+  commandLine 'sh', '-c', 'scripts/check_jar.sh'
+}
+
+shadowJar {
+  zip64 = true
+  if (project.hasProperty('archiveAppendix')) {
+    archiveAppendix.set(project.archiveAppendix)
+  }
+  archiveClassifier = ''
+  // preventing java multi-release JAR leakage
+  // https://github.com/johnrengelman/shadow/issues/729
+  exclude('module-info.class', 'META-INF/versions/**',
+      '**/LICENSE', '**/LICENSE*.txt', '**/NOTICE', '**/NOTICE.txt', 'licenses/**', 'log4j2.*', 'log4j.*')
+  dependencies {
+    exclude(dependency("org.slf4j::"))
+    exclude(dependency("antlr::"))
+    exclude(dependency("org.scala-lang::"))
+    exclude("org/apache/commons/logging/**")
+  }
+  // Gradle-9 / com.gradleup.shadow 9: the dependency-coordinate excludes above no longer strip
+  // these classes from the merged jar (they leak unrelocated -> check_jar.sh fails). slf4j (client
+  // consumers provide their own binding) and antlr2 (pegasus buildtime only) must not ship in the
+  // shaded client jar, so also exclude by file pattern, which shadow 9 still honours.
+  exclude 'org/slf4j/**'
+  exclude 'antlr/**'
+  mergeServiceFiles()
+  // we relocate namespaces manually, because we want to know exactly which libs we are exposing and why
+  // we can move to automatic relocation using ConfigureShadowRelocation after we get to a good place on these first
+  relocate 'org.springframework', 'orrery.shaded.org.springframework'
+  relocate 'com.fasterxml.jackson', 'orrery.shaded.jackson'
+  relocate 'org.yaml', 'orrery.shaded.org.yaml' // Required for shading snakeyaml
+  relocate 'net.jcip.annotations', 'orrery.shaded.annotations'
+  relocate 'javassist', 'orrery.shaded.javassist'
+  relocate 'edu.umd.cs.findbugs', 'orrery.shaded.findbugs'
+  relocate 'org.antlr', 'orrery.shaded.org.antlr'
+  //relocate 'antlr', 'orrery.shaded.antlr'
+  relocate 'com.google.common', 'orrery.shaded.com.google.common'
+  relocate 'org.apache.commons.codec', 'orrery.shaded.org.apache.commons.codec'
+  relocate 'org.apache.commons.compress', 'orrery.shaded.org.apache.commons.compress'
+  relocate 'org.apache.commons.lang3', 'orrery.shaded.org.apache.commons.lang3'
+  relocate 'org.apache.commons.lang', 'orrery.shaded.org.apache.commons.lang'
+  relocate 'org.apache.commons.cli', 'orrery.shaded.org.apache.commons.cli'
+  relocate 'org.apache.commons.text', 'orrery.shaded.org.apache.commons.text'
+  relocate 'org.apache.commons.io', 'orrery.shaded.org.apache.commons.io'
+  relocate 'org.apache.maven', 'orrery.shaded.org.apache.maven'
+  relocate 'org.reflections', 'orrery.shaded.org.reflections'
+  relocate 'st4hidden', 'orrery.shaded.st4hidden'
+  relocate 'org.stringtemplate', 'orrery.shaded.org.stringtemplate'
+  relocate 'org.abego.treelayout', 'orrery.shaded.treelayout'
+  relocate 'javax.annotation', 'orrery.shaded.javax.annotation'
+  relocate 'com.github.benmanes.caffeine', 'orrery.shaded.com.github.benmanes.caffeine'
+  relocate 'org.checkerframework', 'orrery.shaded.org.checkerframework'
+  relocate 'org.jspecify', 'orrery.shaded.org.jspecify'
+  relocate 'com.google.errorprone', 'orrery.shaded.com.google.errorprone'
+  // Below jars added for kafka emitter only
+  relocate 'com.thoughtworks.paranamer', 'orrery.shaded.com.thoughtworks.paranamer'
+  relocate 'org.xerial.snappy', 'orrery.shaded.org.xerial.snappy'
+  relocate 'org.apache.kafka', 'orrery.shaded.org.apache.kafka'
+  relocate 'org.apache.http', 'orrery.shaded.org.apache.http'
+  relocate 'software.amazon.awssdk', 'orrery.shaded.software.amazon.awssdk'
+  relocate 'io.confluent', 'orrery.shaded.io.confluent'
+  relocate 'org.apache.zookeeper', 'orrery.shaded.org.apache.zookeeper'
+  relocate 'org.apache.yetus', 'orrery.shaded.org.apache.yetus'
+  relocate 'jline', 'orrery.shaded.jline'
+  relocate 'org.apache.jute', 'orrery.shaded.org.apache.jute'
+  relocate 'org.I0Itec.zkclient', 'orrery.shaded.org.I0Itec.zkclient'
+  relocate 'net.jpountz', 'orrery.shaded.net.jpountz'
+  relocate 'com.github.luben', 'orrery.shaded.com.github.luben'
+  relocate 'common.message', 'orrery.shaded.common.message'
+  relocate 'org.glassfish', 'orrery.shaded.org.glassfish'
+  relocate 'ch.randelshofer', 'orrery.shaded.ch.randelshofer'
+  relocate 'io.github.classgraph', 'orrery.shaded.io.github.classgraph'
+  relocate 'nonapi.io.github.classgraph', 'orrery.shaded.nonapi.io.github.classgraph'
+  relocate 'org.eclipse.parsson', 'orrery.shaded.parsson'
+  relocate 'jakarta.json', 'orrery.shaded.json'
+  relocate 'io.netty', 'orrery.shaded.io.netty'
+  relocate 'org.apache.hc', 'orrery.shaded.org.apache.hc'
+  relocate 'org.reactivestreams', 'orrery.shaded.org.reactivestreams'
+  relocate 'software.amazon.eventstream', 'orrery.shaded.software.amazon.eventstream'
+  relocate 'at.yawk.lz4', 'orrery.shaded.at.yawk.lz4'
+  finalizedBy checkShadowJar
+}
+
+checkShadowJar {
+  dependsOn shadowJar
+}
+
+assemble {
+  dependsOn shadowJar
+}
+compileTestJava.dependsOn shadowJar
+
+task sourcesJar(type: Jar) {
+  archiveClassifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar) {
+  archiveClassifier = 'javadoc'
+  from javadoc
+}
+
+publishing {
+  publications {
+    shadow(MavenPublication) { from components.shadow
+      pom {
+        name = 'Orrery Client'
+        group = 'io.orrery'
+        artifactId = 'orrery-client' + (project.hasProperty('archiveAppendix') ? "-${archiveAppendix}" : '')
+        description = 'Orrery Java client for metadata integration'
+        url = 'https://docs.orrery.dev'
+        artifacts = [shadowJar, javadocJar, sourcesJar]
+
+        scm {
+          connection = 'scm:git:git://github.com/Dxlxz/orrery.git'
+          developerConnection = 'scm:git:ssh://github.com:Dxlxz/orrery.git'
+          url = 'https://github.com/Dxlxz/orrery.git'
+        }
+
+        licenses {
+          license {
+            name = 'The Apache License, Version 2.0'
+            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+
+        developers {
+          developer {
+            id = 'orrery'
+            name = 'Orrery'
+            email = 'orrery@orrery.dev'
+          }
+        }
+      }
+    }
+  }
+
+  repositories {
+    maven {
+      def releasesRepoUrl = "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
+      def snapshotsRepoUrl = "https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/"
+      def ossrhUsername = System.getenv('RELEASE_USERNAME')
+      def ossrhPassword = System.getenv('RELEASE_PASSWORD')
+      credentials {
+        username ossrhUsername
+        password ossrhPassword
+      }
+      url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+    }
+  }
+}
+
+signing {
+  def signingKey = findProperty("signingKey")
+  def signingPassword = System.getenv("SIGNING_PASSWORD")
+  useInMemoryPgpKeys(signingKey, signingPassword)
+  sign publishing.publications.shadow
+}
+
+nexusStaging {
+  serverUrl = "https://ossrh-staging-api.central.sonatype.com/service/local/"
+  //required only for projects registered in Sonatype after 2021-02-24
+  username = System.getenv("RELEASE_USERNAME")
+  password = System.getenv("RELEASE_PASSWORD")
+}

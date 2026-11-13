@@ -1,0 +1,43 @@
+# Copyright 2021 Orrery, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+#
+# Postgres profile: consume MCP→MCL-related pipeline via pgQueue (see docker-compose.actions.yml).
+name: ${ORRERY_ACTIONS_INGESTION_EXECUTOR_CONSUMER_GROUP_ID:-ingestion_executor}
+source:
+  type: "pg_queue"
+  config:
+    queue:
+      host_port: ${PGQUEUE_HOST_PORT:-postgres:5432}
+      database: ${PGQUEUE_DATABASE:-orrery}
+      username: ${PGQUEUE_USERNAME:-orrery}
+      password: ${PGQUEUE_PASSWORD:-orrery}
+      queue_schema: ${ORRERY_PGQUEUE_SCHEMA:-queue}
+      table_prefix: ${ORRERY_PGQUEUE_TABLE_PREFIX:-metadata_queue}
+    schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://orrery-gms:8080/schema-registry/api/}
+    topic_routes:
+      mcl: ${METADATA_CHANGE_LOG_VERSIONED_TOPIC_NAME:-MetadataChangeLog_Versioned_v1}
+      pe: ${PLATFORM_EVENT_TOPIC_NAME:-PlatformEvent_v1}
+    payload_kind_by_route_key:
+      mcl: mcl
+      pe: pe
+filter:
+  event_type: "MetadataChangeLogEvent_v1"
+  event:
+    entityType: "orreryExecutionRequest"
+    changeType: "UPSERT"
+    aspectName:
+      - "orreryExecutionRequestInput"
+      - "orreryExecutionRequestSignal"
+    aspect:
+      value:
+        executorId: "${EXECUTOR_ID:-default}"
+action:
+  type: "executor"
+  config:
+    executor_id: "${EXECUTOR_ID:-default}"
+orrery:
+  server: "${ORRERY_GMS_PROTOCOL:-http}://${ORRERY_GMS_HOST:-localhost}:${ORRERY_GMS_PORT:-8080}"
+  extra_headers:
+    Authorization: "Basic ${ORRERY_SYSTEM_CLIENT_ID:-__orrery_system}:${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}"

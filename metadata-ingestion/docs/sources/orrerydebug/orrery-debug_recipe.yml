@@ -1,0 +1,6 @@
+source:
+  type: orrery-debug
+  config: {}
+
+sink:
+  # sink configs

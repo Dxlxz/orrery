@@ -1,0 +1,67 @@
+namespace com.linkedin.metadata.key
+
+import com.linkedin.common.Urn
+import com.linkedin.common.FabricType
+
+/**
+ * Key for an ML model
+ */
+@Aspect = {
+  "name": "mlModelKey",
+  "schemaVersion": 2
+}
+record MLModelKey {
+  /**
+  * Standardized platform urn for the model
+  */
+  @Searchable = {
+    "fieldType": "URN",
+    "queryByDefault": false,
+    "enableAutocomplete": true,
+    "v3": {
+      "searchLabel": "platform",
+      "copyToOther": true
+    }
+  }
+  platform: Urn
+
+  /**
+  * Name of the MLModel
+  */
+  @Searchable = {
+    "fieldName": "id",
+    "fieldType": "WORD_GRAM",
+    "enableAutocomplete": true,
+    "boostScore": 10.0,
+    "fieldNameAliases": [ "_entityName" ],
+    "v3": {
+      "queryByDefault": true,
+      "searchLabel": "name",
+      "lowercase": true,
+      "mappings": [
+        { "type": "KEYWORD" },
+        { "subfield": "text", "type": "TEXT" },
+        { "subfield": "stemmed", "type": "STEMMED" }
+      ]
+    }
+  }
+  name: string
+
+  /**
+  * Fabric type where model belongs to or where it was generated
+  */
+  @Searchable = {
+    "fieldType": "TEXT_PARTIAL",
+    "addToFilters": true,
+    "filterNameOverride": "Environment",
+    "queryByDefault": false,
+    "v3": {
+      "searchLabel": "origin",
+      "queryByDefault": false,
+      "mappings": [
+        { "type": "KEYWORD" }
+      ]
+    }
+  }
+  origin: FabricType
+}

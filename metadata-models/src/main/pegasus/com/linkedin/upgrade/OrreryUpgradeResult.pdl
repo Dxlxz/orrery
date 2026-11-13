@@ -1,0 +1,25 @@
+namespace com.linkedin.upgrade
+
+/**
+ * Information collected when a OrreryUpgrade successfully finishes
+ */
+@Aspect = {
+   "name": "orreryUpgradeResult"
+}
+record OrreryUpgradeResult {
+
+    /**
+     * Upgrade state  UpgradeResult.Result
+     */
+    state: optional OrreryUpgradeState = "SUCCEEDED"
+
+    /**
+     * Timestamp when we started this OrreryUpgrade
+     */
+    timestampMs: long
+
+    /**
+     * Result map to place helpful information about this upgrade job
+     */
+    result: optional map[string, string]
+}

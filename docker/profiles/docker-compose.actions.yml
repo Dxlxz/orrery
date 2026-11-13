@@ -1,0 +1,222 @@
+x-search-datastore-elasticsearch-env: &search-datastore-env
+  ELASTICSEARCH_HOST: search
+  ELASTICSEARCH_PORT: 9200
+  ELASTICSEARCH_PROTOCOL: http
+  ELASTICSEARCH_USE_SSL: ${ELASTICSEARCH_USE_SSL:-false}
+
+x-orrery-actions-service: &orrery-actions-service
+  hostname: actions
+  image: ${ORRERY_ACTIONS_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-actions}:${ORRERY_ACTIONS_VERSION:-${ORRERY_VERSION:-quickstart}-slim}
+  env_file:
+    - orrery-actions/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_ACTIONS_ENV:-empty2.env}
+  environment:
+    <<: *search-datastore-env
+    ACTIONS_EXTRA_PACKAGES: ${ACTIONS_EXTRA_PACKAGES:-}
+    ACTIONS_CONFIG: ${ACTIONS_CONFIG:-}
+    KAFKA_BOOTSTRAP_SERVER: broker:29092
+    SCHEMA_REGISTRY_URL: http://orrery-gms:8080${ORRERY_GMS_BASE_PATH:-}/schema-registry/api/
+
+x-orrery-actions-service-dev: &orrery-actions-service-dev
+  <<: *orrery-actions-service
+  volumes:
+    - ./orrery-actions/start.sh:/start_orrery_actions.sh
+    - ../../metadata-ingestion/src:/metadata-ingestion/src
+    - ../../orrery-actions/src:/orrery-actions/src
+    - ${HOME}/.aws:/home/orrery/.aws:ro
+    - ${HOME}/.aws/sso/cache:/home/orrery/.aws/sso/cache:rw
+  environment:
+    <<: *search-datastore-env
+    ACTIONS_EXTRA_PACKAGES: ${ACTIONS_EXTRA_PACKAGES:-}
+    ACTIONS_CONFIG: ${ACTIONS_CONFIG:-}
+    KAFKA_BOOTSTRAP_SERVER: broker:29092
+    SCHEMA_REGISTRY_URL: http://orrery-gms:8080${ORRERY_GMS_BASE_PATH:-}/schema-registry/api/
+    AWS_PROFILE:
+    AWS_SDK_LOAD_CONFIG: ${AWS_SDK_LOAD_CONFIG:-1}
+
+x-orrery-actions-quickstart-service: &orrery-actions-quickstart-service
+  <<: *orrery-actions-service
+  volumes:
+    - ${HOME}/.aws:/home/orrery/.aws:ro
+    - ${HOME}/.aws/sso/cache:/home/orrery/.aws/sso/cache:rw
+  environment:
+    <<: *search-datastore-env
+    ACTIONS_EXTRA_PACKAGES: ${ACTIONS_EXTRA_PACKAGES:-}
+    ACTIONS_CONFIG: ${ACTIONS_CONFIG:-}
+    KAFKA_BOOTSTRAP_SERVER: broker:29092
+    SCHEMA_REGISTRY_URL: http://orrery-gms:8080${ORRERY_GMS_BASE_PATH:-}/schema-registry/api/
+    AWS_PROFILE:
+    AWS_SDK_LOAD_CONFIG: ${AWS_SDK_LOAD_CONFIG:-1}
+
+# Non-CDC Postgres profiles use pgQueue-backed system action configs (Python consumer in container).
+x-orrery-actions-postgres-pgqueue-env: &orrery-actions-postgres-pgqueue-env
+  <<: *search-datastore-env
+  ACTIONS_EXTRA_PACKAGES: ${ACTIONS_EXTRA_PACKAGES:-}
+  ACTIONS_CONFIG: ${ACTIONS_CONFIG:-}
+  KAFKA_BOOTSTRAP_SERVER: broker:29092
+  SCHEMA_REGISTRY_URL: http://orrery-gms:8080${ORRERY_GMS_BASE_PATH:-}/schema-registry/api/
+  ORRERY_ACTIONS_SYSTEM_CONFIGS_PATH: /etc/orrery/actions/system/conf-postgres-pgqueue
+  PGQUEUE_HOST_PORT: postgres:5432
+  PGQUEUE_DATABASE: orrery
+  PGQUEUE_USERNAME: ${ORRERY_EBEAN_DATASOURCE_ROOT_USERNAME:-orrery}
+  PGQUEUE_PASSWORD: ${ORRERY_EBEAN_DATASOURCE_ROOT_PASSWORD:-orrery}
+  ORRERY_PGQUEUE_SCHEMA: ${ORRERY_PGQUEUE_SCHEMA:-queue}
+  ORRERY_PGQUEUE_TABLE_PREFIX: ${ORRERY_PGQUEUE_TABLE_PREFIX:-metadata_queue}
+  AWS_PROFILE:
+  AWS_SDK_LOAD_CONFIG: ${AWS_SDK_LOAD_CONFIG:-1}
+
+services:
+  orrery-actions-quickstart:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart
+      - quickstart-backend
+      - quickstart-opensearch2
+    depends_on:
+      orrery-gms-quickstart:
+        condition: service_healthy
+  orrery-actions-quickstart-opensearch3:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-opensearch3
+    depends_on:
+      orrery-gms-quickstart-opensearch3:
+        condition: service_healthy
+  orrery-actions-quickstart-cassandra:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-cassandra
+    depends_on:
+      orrery-gms-quickstart-cassandra:
+        condition: service_healthy
+  orrery-actions-quickstart-postgres:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-postgres
+    depends_on:
+      orrery-gms-quickstart-postgres:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *orrery-actions-postgres-pgqueue-env
+  orrery-actions-quickstart-postgres-consumers:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-postgres-consumers
+    depends_on:
+      orrery-gms-quickstart-postgres-consumers:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *orrery-actions-postgres-pgqueue-env
+  orrery-actions-quickstart-consumers:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-consumers
+    depends_on:
+      orrery-gms-quickstart-consumers:
+        condition: service_healthy
+  orrery-actions-quickstart-consumers-cdc:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-consumers-cdc
+    depends_on:
+      orrery-gms-quickstart-consumers-cdc:
+        condition: service_healthy
+  orrery-actions-quickstart-postgres-cdc:
+    <<: *orrery-actions-quickstart-service
+    profiles:
+      - quickstart-postgres-cdc
+    depends_on:
+      orrery-gms-quickstart-postgres-cdc:
+        condition: service_healthy
+  orrery-actions-debug:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug
+      - debug-backend
+      - debug-opensearch2
+    depends_on:
+      orrery-gms-debug:
+        condition: service_healthy
+  orrery-actions-debug-aws:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-backend-aws
+    depends_on:
+      orrery-gms-debug-aws:
+        condition: service_healthy
+  orrery-actions-debug-postgres:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-postgres
+    depends_on:
+      orrery-gms-debug-postgres:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *orrery-actions-postgres-pgqueue-env
+  orrery-actions-debug-postgres-consumers:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-postgres-consumers
+    depends_on:
+      orrery-gms-debug-postgres-consumers:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *orrery-actions-postgres-pgqueue-env
+  orrery-actions-debug-postgres-cdc:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-postgres-cdc
+    depends_on:
+      orrery-gms-debug-postgres-cdc:
+        condition: service_healthy
+  orrery-actions-debug-cassandra:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-cassandra
+    depends_on:
+      orrery-gms-debug-cassandra:
+        condition: service_healthy
+  orrery-actions-debug-consumers:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-consumers
+    depends_on:
+      orrery-gms-debug-consumers:
+        condition: service_healthy
+  orrery-actions-debug-consumers-cdc:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-consumers-cdc
+    depends_on:
+      orrery-gms-debug-consumers-cdc:
+        condition: service_healthy
+  orrery-actions-debug-neo4j:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-neo4j
+    depends_on:
+      orrery-gms-debug-neo4j:
+        condition: service_healthy
+  orrery-actions-debug-elasticsearch:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-elasticsearch
+    depends_on:
+      orrery-gms-debug-elasticsearch:
+        condition: service_healthy
+  orrery-actions-debug-opensearch3:
+    <<: *orrery-actions-service-dev
+    profiles:
+      - debug-opensearch3
+    depends_on:
+      orrery-gms-debug-opensearch3:
+        condition: service_healthy

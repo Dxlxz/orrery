@@ -1,0 +1,33 @@
+namespace com.linkedin.metadata.key
+
+import com.linkedin.common.Urn
+
+/**
+ * Key for a GlossaryTerm
+ */
+@Aspect = {
+  "name": "glossaryTermKey"
+}
+record GlossaryTermKey {
+  /**
+  * The term name, which serves as a unique id
+  */
+  @Searchable = {
+    "v3": {
+      "queryByDefault": true,
+      "searchLabel": "id",
+      "boostScore": 2.0,
+      "lowercase": true,
+      "mappings": [
+        { "type": "KEYWORD" },
+        { "subfield": "text", "type": "TEXT" },
+        { "subfield": "stemmed", "type": "STEMMED" }
+      ]
+    },
+    "fieldType": "WORD_GRAM",
+    "enableAutocomplete": true,
+    "fieldName": "id"
+  }
+  name: string
+
+}

@@ -1,0 +1,13 @@
+source:
+  type: csv-enricher
+  config:
+    # relative path to your csv file to ingest
+    filename: ./path/to/your/file.csv
+
+    # optional explicit mapping from CSV columns to structured properties
+    structured_properties:
+      tier: "io.orrery.metadata.tier"
+      classification: "urn:li:structuredProperty:io.orrery.privacy.classification"
+
+# Default sink is orrery-rest and doesn't need to be configured
+# See https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for customization options

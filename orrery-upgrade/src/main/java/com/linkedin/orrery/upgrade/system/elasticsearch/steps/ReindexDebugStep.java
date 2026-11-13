@@ -1,0 +1,120 @@
+package com.linkedin.orrery.upgrade.system.elasticsearch.steps;
+
+import com.linkedin.common.urn.Urn;
+import com.linkedin.orrery.upgrade.UpgradeContext;
+import com.linkedin.orrery.upgrade.UpgradeStep;
+import com.linkedin.orrery.upgrade.UpgradeStepResult;
+import com.linkedin.orrery.upgrade.impl.DefaultUpgradeStepResult;
+import com.linkedin.orrery.upgrade.system.elasticsearch.ReindexDebugArgs;
+import com.linkedin.metadata.search.elasticsearch.ElasticSearchService;
+import com.linkedin.metadata.search.elasticsearch.indexbuilder.ReindexConfig;
+import com.linkedin.metadata.shared.ElasticSearchIndexed;
+import com.linkedin.structured.StructuredPropertyDefinition;
+import com.linkedin.upgrade.OrreryUpgradeState;
+import com.linkedin.util.Pair;
+import io.orreryproject.metadata.context.OperationContext;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import lombok.Getter;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class ReindexDebugStep implements UpgradeStep {
+
+  private final List<ElasticSearchIndexed> services;
+  private final Supplier<Set<Pair<Urn, StructuredPropertyDefinition>>> structuredProperties;
+  @Getter public ReindexDebugArgs args;
+  // ours, entity
+  private ElasticSearchIndexed service;
+  private ReindexConfig config;
+
+  String getIndex(final Map<String, Optional<String>> parsedArgs) {
+    String index = null;
+    if (containsKey(parsedArgs, "index")) {
+      index = parsedArgs.get("index").get();
+    }
+    return index != null ? index : "";
+  }
+
+  public ReindexDebugArgs createArgs(UpgradeContext context) {
+    if (args != null) {
+      return args;
+    } else {
+      ReindexDebugArgs result = new ReindexDebugArgs();
+      result.index = getIndex(context.parsedArgs());
+      args = result;
+      return result;
+    }
+  }
+
+  @SneakyThrows
+  public ReindexDebugStep(
+      List<ElasticSearchIndexed> services,
+      Supplier<Set<Pair<Urn, StructuredPropertyDefinition>>> structuredProperties) {
+    this.services = services;
+    this.structuredProperties = structuredProperties;
+    // pick ours
+    for (ElasticSearchIndexed es : services) {
+      if (es instanceof ElasticSearchService) {
+        this.service = es;
+        break;
+      }
+    }
+  }
+
+  @Override
+  public String id() {
+    return "ReindexDebugStep";
+  }
+
+  @Override
+  public Function<UpgradeContext, UpgradeStepResult> executable() {
+    return (context) -> {
+      ReindexDebugArgs args = createArgs(context);
+      try {
+        if (service == null) {
+          log.error("ReindexDebugStep failed: No ElasticSearchService found");
+          return new DefaultUpgradeStepResult(id(), OrreryUpgradeState.FAILED);
+        }
+        setConfig(context.opContext(), args.index);
+        if (config == null) {
+          log.error("ReindexDebugStep failed: No matching config found for index: {}", args.index);
+          return new DefaultUpgradeStepResult(id(), OrreryUpgradeState.FAILED);
+        }
+        try {
+          service.getIndexBuilder(config.name()).buildIndex(context.opContext(), config);
+        } catch (IOException e) {
+          log.error("ReindexDebugStep failed: IOException during buildIndex", e);
+          return new DefaultUpgradeStepResult(id(), OrreryUpgradeState.FAILED);
+        }
+      } catch (Exception e) {
+        log.error("ReindexDebugStep failed.", e);
+        return new DefaultUpgradeStepResult(id(), OrreryUpgradeState.FAILED);
+      }
+      return new DefaultUpgradeStepResult(id(), OrreryUpgradeState.SUCCEEDED);
+    };
+  }
+
+  void setConfig(OperationContext opContext, String targetIndex)
+      throws IOException, IllegalAccessException {
+    // orrerypolicyindex_v2 has some docs upon starting quickdebug...
+    //  String targetIndex = "orrerypolicyindex_v2";
+    List<ReindexConfig> configs =
+        service.buildReindexConfigs(opContext, structuredProperties.get());
+    config = null; // Reset config to null
+    for (ReindexConfig cfg : configs) {
+      String cfgname = cfg.name();
+      if (cfgname.startsWith(targetIndex)) {
+        config = cfg;
+        config.forceReindex();
+        break;
+      }
+    }
+  }
+}

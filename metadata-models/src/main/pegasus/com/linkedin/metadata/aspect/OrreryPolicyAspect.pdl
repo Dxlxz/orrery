@@ -1,0 +1,12 @@
+namespace com.linkedin.metadata.aspect
+
+import com.linkedin.metadata.key.OrreryPolicyKey
+import com.linkedin.policy.OrreryPolicyInfo
+
+/**
+ * A union of all supported metadata aspects for a Orrery access policy.
+ */
+typeref OrreryPolicyAspect = union[
+    OrreryPolicyKey,
+    OrreryPolicyInfo
+]

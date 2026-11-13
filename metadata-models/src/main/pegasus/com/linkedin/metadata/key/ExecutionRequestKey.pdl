@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for an Orrery Execution Request
+ */
+@Aspect = {
+  "name": "orreryExecutionRequestKey"
+}
+record ExecutionRequestKey {
+  /**
+   * A unique id for the Orrery execution request.
+   */
+  id: string
+}

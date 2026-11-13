@@ -1,0 +1,11 @@
+foo: bar
+nested:
+  hi: hello
+  __ORRERY_TO_FILE_ssl_cert: |
+    -----BEGIN CERTIFICATE-----
+    thisisnotarealcert
+    -----END CERTIFICATE-----
+
+  __ORRERY_TO_FILE_ssl_key: ${ORRERY_SSL_KEY}
+
+  another-key: final-value

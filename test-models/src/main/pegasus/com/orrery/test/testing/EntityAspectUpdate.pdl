@@ -1,0 +1,6 @@
+namespace com.orrery.test.testing
+
+/**
+ * For unit tests
+ */
+typeref EntityAspectUpdate = union[AspectFoo, AspectBar, AspectFooEvolved]

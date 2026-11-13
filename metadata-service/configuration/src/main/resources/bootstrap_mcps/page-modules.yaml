@@ -1,0 +1,135 @@
+# Instructions to add additional entry
+# 1. Add new entry to this list
+# 2. Increment version in bootstrap_mcps.yaml for the entry referring to this file
+- entityUrn: urn:li:orreryPageModule:your_assets
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Your Assets"
+    type: OWNED_ASSETS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:top_domains
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Domains"
+    type: DOMAINS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:assets
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Assets"
+    type: ASSETS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:output_ports
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Output Ports"
+    type: OUTPUT_PORTS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:child_hierarchy
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Children"
+    type: CHILD_HIERARCHY
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:data_products
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Data Products"
+    type: DATA_PRODUCTS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:sub_data_products
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Sub-products"
+    type: SUB_DATA_PRODUCTS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:related_terms
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Related Terms"
+    type: RELATED_TERMS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:platforms
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Platforms"
+    type: PLATFORMS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:lineage
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Lineage"
+    type: LINEAGE
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}
+- entityUrn: urn:li:orreryPageModule:columns
+  entityType: orreryPageModule
+  aspectName: orreryPageModuleProperties
+  changeType: UPSERT
+  aspect:
+    name: "Columns"
+    type: COLUMNS
+    visibility:
+      scope: GLOBAL
+    params: {}
+    created: {{&auditStamp}}
+    lastModified: {{&auditStamp}}

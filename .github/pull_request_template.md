@@ -1,0 +1,17 @@
+<!--
+
+Thank you for contributing to Orrery!
+
+Before you submit your PR, please go through the checklist below:
+
+- [ ] The PR conforms to Orrery's [Contributing Guideline](https://github.com/Dxlxz/orrery/blob/master/docs/CONTRIBUTING.md) (particularly [PR Title Format](https://github.com/Dxlxz/orrery/blob/master/docs/CONTRIBUTING.md#pr-title-format))
+- [ ] Links to related issues (if applicable)
+- [ ] Tests for the changes have been added/updated (if applicable)
+- [ ] Docs related to the changes have been added/updated (if applicable). If a new feature has been added a Usage Guide has been added for the same.
+- [ ] For any breaking change/potential downtime/deprecation/big changes an entry has been made in [Breaking Changes](https://github.com/Dxlxz/orrery/blob/master/docs/how/breaking-changes.md)
+
+
+Allowed Types in PR Title: _feat_, _fix_, _refactor_, _docs_, _test_, _perf_, _style_, _build_, _ci_, _chore_
+
+
+-->

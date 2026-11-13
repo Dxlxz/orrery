@@ -1,0 +1,12 @@
+{
+    "lastModified": {
+        "actor": "urn:li:corpuser:orrery",
+        "time": 1581407189000
+    },
+    "owners": [
+        {
+            "owner": "urn:li:corpuser:orrery",
+            "type": "DATAOWNER"
+        }
+    ]
+}

@@ -1,0 +1,41 @@
+# Copyright 2021 Orrery, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+#
+# Postgres profile: term propagation driven by pgQueue PE stream.
+name: ${ORRERY_ACTIONS_TERM_PROPAGATION_CONSUMER_GROUP_ID:-orrery_term_propagation_action}
+# Disabled by default. Set ORRERY_ACTIONS_TERM_PROPAGATION_ENABLED=true to run it.
+enabled: ${ORRERY_ACTIONS_TERM_PROPAGATION_ENABLED:-false}
+source:
+  type: "pg_queue"
+  config:
+    queue:
+      host_port: ${PGQUEUE_HOST_PORT:-postgres:5432}
+      database: ${PGQUEUE_DATABASE:-orrery}
+      username: ${PGQUEUE_USERNAME:-orrery}
+      password: ${PGQUEUE_PASSWORD:-orrery}
+      queue_schema: ${ORRERY_PGQUEUE_SCHEMA:-queue}
+      table_prefix: ${ORRERY_PGQUEUE_TABLE_PREFIX:-metadata_queue}
+    schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://orrery-gms:8080/schema-registry/api/}
+    topic_routes:
+      mcl: ${METADATA_CHANGE_LOG_VERSIONED_TOPIC_NAME:-MetadataChangeLog_Versioned_v1}
+      pe: ${PLATFORM_EVENT_TOPIC_NAME:-PlatformEvent_v1}
+    payload_kind_by_route_key:
+      mcl: mcl
+      pe: pe
+filters:
+  - type: event_type
+    config:
+      filter:
+        EntityChangeEvent_v1:
+          event:
+            - category: "GLOSSARY_TERM"
+action:
+  type: term_propagation
+  # By default every term is propagated. To restrict to specific terms (and terms
+  # that inherit from them), add `config.target_terms: [urn:li:glossaryTerm:...]`.
+
+orrery:
+  server: '${ORRERY_GMS_PROTOCOL:-http}://${ORRERY_GMS_HOST:-localhost}:${ORRERY_GMS_PORT:-8080}'
+  extra_headers:
+    Authorization: 'Basic ${ORRERY_SYSTEM_CLIENT_ID:-__orrery_system}:${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}'

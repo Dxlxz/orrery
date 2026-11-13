@@ -1,0 +1,6 @@
+# Spring configuration classes in this module that no real-context test loads yet.
+# This list may only shrink. See gradle/wiring/README.md.
+com.linkedin.orrery.upgrade.UpgradeConfigurationSelector$SqlSetupConfiguration
+com.linkedin.orrery.upgrade.config.IncrementalReindexConfig
+com.linkedin.orrery.upgrade.sqlsetup.SqlSetupUpgradeConfig
+com.linkedin.orrery.upgrade.sqlsetup.config.SqlSetupEbeanFactory

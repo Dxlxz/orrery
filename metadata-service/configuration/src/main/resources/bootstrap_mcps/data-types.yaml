@@ -1,0 +1,43 @@
+# Instructions to add additional entry
+# 1. Add new entry to this list
+# 2. Increment version in bootstrap_mcps.yaml for the entry referring to this file
+- entityUrn: urn:li:dataType:orrery.string
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    qualifiedName: orrery.string
+    displayName: String
+    description: A string of characters.
+- entityUrn: urn:li:dataType:orrery.number
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    qualifiedName: orrery.number
+    displayName: Number
+    description: An integer or decimal number.
+- entityUrn: urn:li:dataType:orrery.urn
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    qualifiedName: orrery.urn
+    displayName: Urn
+    description: An unique identifier for a Orrery entity.
+- entityUrn: urn:li:dataType:orrery.rich_text
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    qualifiedName: orrery.rich_text
+    displayName: Rich Text
+    description: An attributed string of characters.
+- entityUrn: urn:li:dataType:orrery.date
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    qualifiedName: orrery.date
+    displayName: Date
+    description: A specific day, without time.

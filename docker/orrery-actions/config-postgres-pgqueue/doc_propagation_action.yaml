@@ -1,0 +1,39 @@
+# Copyright 2021 Orrery, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+#
+# Postgres profile: doc propagation driven by pgQueue MCL / PE streams.
+name: ${ORRERY_ACTIONS_DOC_PROPAGATION_CONSUMER_GROUP_ID:-orrery_doc_propagation_action}
+enabled: ${ORRERY_ACTIONS_DOC_PROPAGATION_ENABLED:-true}
+source:
+  type: "pg_queue"
+  config:
+    queue:
+      host_port: ${PGQUEUE_HOST_PORT:-postgres:5432}
+      database: ${PGQUEUE_DATABASE:-orrery}
+      username: ${PGQUEUE_USERNAME:-orrery}
+      password: ${PGQUEUE_PASSWORD:-orrery}
+      queue_schema: ${ORRERY_PGQUEUE_SCHEMA:-queue}
+      table_prefix: ${ORRERY_PGQUEUE_TABLE_PREFIX:-metadata_queue}
+    schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://orrery-gms:8080/schema-registry/api/}
+    topic_routes:
+      mcl: ${METADATA_CHANGE_LOG_VERSIONED_TOPIC_NAME:-MetadataChangeLog_Versioned_v1}
+      pe: ${PLATFORM_EVENT_TOPIC_NAME:-PlatformEvent_v1}
+    payload_kind_by_route_key:
+      mcl: mcl
+      pe: pe
+action:
+  type: doc_propagation
+  config:
+    columns_enabled: ${ORRERY_ACTIONS_DOC_PROPAGATION_COLUMNS_ENABLED:-true}
+    max_propagation_depth: ${ORRERY_ACTIONS_DOC_PROPAGATION_MAX_PROPAGATION_DEPTH:-5}
+    max_propagation_fanout: ${ORRERY_ACTIONS_DOC_PROPAGATION_MAX_PROPAGATION_FANOUT:-1000}
+    max_propagation_time_millis: ${ORRERY_ACTIONS_DOC_PROPAGATION_MAX_PROPAGATION_TIME_MILLIS:-3600000}
+    rate_limit_propagated_writes: ${ORRERY_ACTIONS_DOC_PROPAGATION_RATE_LIMIT_PROPAGATED_WRITES:-1500}
+    rate_limit_propagated_writes_period: ${ORRERY_ACTIONS_DOC_PROPAGATION_RATE_LIMIT_PROPAGATED_WRITES_PERIOD:-15}
+
+orrery:
+  server: '${ORRERY_GMS_PROTOCOL:-http}://${ORRERY_GMS_HOST:-localhost}:${ORRERY_GMS_PORT:-8080}'
+  extra_headers:
+    Authorization: 'Basic ${ORRERY_SYSTEM_CLIENT_ID:-__orrery_system}:${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}'

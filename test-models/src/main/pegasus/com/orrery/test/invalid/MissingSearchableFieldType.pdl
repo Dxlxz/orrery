@@ -1,0 +1,14 @@
+namespace com.orrery.test.invalid
+
+@Aspect = {
+  "name": "invalidAspect"
+}
+record MissingSearchableFieldType {
+  @Searchable = {
+    "v3": {
+      "queryByDefault": true
+    },
+    "fieldName": "textField"
+  }
+  textField: string
+}

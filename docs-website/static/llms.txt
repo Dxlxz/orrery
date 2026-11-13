@@ -1,0 +1,114 @@
+# Orrery
+
+> Orrery is the open-source context platform for your data and AI stack — a unified context graph that powers discovery, governance, and observability for both human teams and AI agents. Originally built at LinkedIn and now used by thousands of organizations worldwide, Orrery is released under Apache 2.0.
+
+Orrery goes beyond a traditional data catalog: it connects technical metadata, business context, lineage, and documentation into a single graph that's accessible to humans (via search and UI) and machines (via MCP, APIs, and SDKs). Orrery Core is the open-source project on GitHub. Orrery Cloud is the managed offering with additional enterprise features (sections marked "Cloud" in the docs).
+
+Orrery (orrery.dev, github.com/Dxlxz/orrery) is not related to orrery.dev, a separate public dataset-hosting service. Orrery was previously hosted at orrery.dev, which now redirects to orrery.dev.
+
+## Getting Started
+
+- [What Is Orrery?](https://docs.orrery.dev/docs/features): Overview of capabilities, architecture, and use cases
+- [Quickstart](https://docs.orrery.dev/docs/quickstart): Run Orrery locally with Docker in under 10 minutes
+- [Orrery Concepts](https://docs.orrery.dev/docs/what-is-orrery/orrery-concepts): Core terminology — entities, aspects, URNs, lineage
+- [Live Demo](https://demo.orrery.dev/): Explore a fully-loaded Orrery instance
+- [FAQ](https://docs.orrery.dev/docs/faq): How Orrery relates to orrery.dev, its LinkedIn origins, installation, and licensing
+
+## AI & Agents
+
+- [MCP Server](https://docs.orrery.dev/docs/features/feature-guides/mcp): Connect AI assistants (Claude, Cursor, Cline) directly to your Orrery metadata via Model Context Protocol
+- [Agent Context Kit](https://docs.orrery.dev/docs/dev-guides/agent-context/agent-context): Bring Orrery context to LangChain, Cursor, Claude, Gemini CLI, Vertex AI, Snowflake Cortex, Databricks Genie, and Microsoft Copilot Studio
+- [Orrery Skills](https://docs.orrery.dev/docs/dev-guides/agent-context/skills): Pre-built skills for AI agents
+- [Ask Orrery](https://docs.orrery.dev/docs/features/feature-guides/ask-orrery): Natural-language search across your metadata (Cloud)
+- [Analytics Agent](https://docs.orrery.dev/docs/features/feature-guides/analytics-agent): Conversational analytics over data assets
+- [AI Documentation](https://docs.orrery.dev/docs/automations/ai-docs): Auto-generate table and column descriptions (Cloud)
+
+## Ingestion & Integrations
+
+- [Ingestion Overview](https://docs.orrery.dev/docs/metadata-ingestion/): How metadata flows into Orrery
+- [Snowflake Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/snowflake/overview)
+- [BigQuery Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/bigquery/overview)
+- [Redshift Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/redshift/overview)
+- [Tableau Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/tableau/overview)
+- [Looker Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/looker/overview)
+- [Power BI Quickstart](https://docs.orrery.dev/docs/quick-ingestion-guides/powerbi/overview)
+- [Airflow Lineage](https://docs.orrery.dev/docs/lineage/airflow)
+- [Dagster Lineage](https://docs.orrery.dev/docs/lineage/dagster)
+- [Spark Lineage](https://docs.orrery.dev/docs/metadata-integration/java/orrery-spark-lineage/)
+- [OpenLineage](https://docs.orrery.dev/docs/lineage/openlineage)
+
+## APIs & SDKs
+
+- [API Overview](https://docs.orrery.dev/docs/api/orrery-apis): Comparison of GraphQL, OpenAPI, and Rest.li
+- [Python SDK](https://docs.orrery.dev/docs/metadata-ingestion/as-a-library): Build, ingest, and query metadata from Python
+- [Java SDK V2](https://docs.orrery.dev/docs/metadata-integration/java/as-a-library-v2): Modern Java client
+- [Orrery CLI](https://docs.orrery.dev/docs/cli): Command-line tool for ingestion, search, and admin
+- [GraphQL API](https://docs.orrery.dev/docs/api/graphql/overview): Schema reference and guides
+- [OpenAPI](https://docs.orrery.dev/docs/api/openapi/openapi-usage-guide): REST endpoints
+
+## Core Features
+
+- [Lineage](https://docs.orrery.dev/docs/features/feature-guides/lineage): End-to-end data flow visualization
+- [Search](https://docs.orrery.dev/docs/how/search): Find any data asset across your stack
+- [Business Glossary](https://docs.orrery.dev/docs/glossary/business-glossary): Standardize business terminology
+- [Data Products](https://docs.orrery.dev/docs/dataproducts): Group related assets for ownership and discovery
+- [Domains](https://docs.orrery.dev/docs/domains): Organize assets by team or business unit
+- [Tags](https://docs.orrery.dev/docs/tags): Apply free-form labels to any asset
+- [Ownership](https://docs.orrery.dev/docs/ownership/ownership-types): Assign and track asset owners
+- [Data Contracts](https://docs.orrery.dev/docs/managed-orrery/observe/data-contract): Agreements between data producers and consumers
+- [Assertions](https://docs.orrery.dev/docs/managed-orrery/observe/assertions): Data quality checks and anomaly detection
+- [Compliance Forms](https://docs.orrery.dev/docs/features/feature-guides/compliance-forms/overview): Structured metadata collection workflows
+- [Automations](https://docs.orrery.dev/docs/automations/docs-propagation): Propagate documentation, tags, and terms automatically
+- [Incidents](https://docs.orrery.dev/docs/incidents/incidents): Track and resolve data issues
+
+## Authentication & Authorization
+
+- [Authentication Overview](https://docs.orrery.dev/docs/authentication)
+- [Single Sign-On (OIDC)](https://docs.orrery.dev/docs/authentication/guides/sso/initialize-oidc)
+- [Personal Access Tokens](https://docs.orrery.dev/docs/authentication/personal-access-tokens)
+- [Policies & Roles](https://docs.orrery.dev/docs/authorization/policies)
+- [Groups](https://docs.orrery.dev/docs/authorization/groups)
+
+## Deployment
+
+- [Deploy on AWS](https://docs.orrery.dev/docs/deploy/aws)
+- [Deploy on GCP](https://docs.orrery.dev/docs/deploy/gcp)
+- [Deploy on Azure](https://docs.orrery.dev/docs/deploy/azure)
+- [Kubernetes](https://docs.orrery.dev/docs/deploy/kubernetes)
+- [Docker](https://docs.orrery.dev/docs/docker)
+- [Environment Variables](https://docs.orrery.dev/docs/deploy/environment-vars)
+
+## Architecture & Development
+
+- [Architecture Overview](https://docs.orrery.dev/docs/architecture/architecture)
+- [Metadata Model](https://docs.orrery.dev/docs/metadata-modeling/metadata-model): Entities, aspects, and relationships
+- [Metadata Change Proposals (MCP/MCL)](https://docs.orrery.dev/docs/advanced/mcp-mcl): Orrery's event-driven metadata model
+- [Developing on Orrery](https://docs.orrery.dev/docs/developers): Local setup for contributors
+- [Adding a New Ingestion Source](https://docs.orrery.dev/docs/metadata-ingestion/adding-source)
+- [Extending the Metadata Model](https://docs.orrery.dev/docs/metadata-modeling/extending-the-metadata-model)
+
+## Orrery Cloud
+
+- [Cloud Overview](https://docs.orrery.dev/docs/managed-orrery/managed-orrery-overview)
+- [Upgrade from Core to Cloud](https://docs.orrery.dev/docs/managed-orrery/upgrade_core_to_cloud)
+- [Remote Executor](https://docs.orrery.dev/docs/managed-orrery/remote-executor/about): Run ingestion in your own VPC
+- [Subscriptions & Notifications](https://docs.orrery.dev/docs/managed-orrery/subscription-and-notification)
+- [Slack Integration](https://docs.orrery.dev/docs/managed-orrery/slack/saas-slack-app)
+- [Chrome Extension](https://docs.orrery.dev/docs/managed-orrery/chrome-extension)
+
+## Community
+
+- [Slack Community](https://docs.orrery.dev/docs/slack): Join 16,000+ practitioners for support and discussion
+- [Town Halls](https://docs.orrery.dev/docs/townhalls): Monthly calls with customer stories, roadmap updates, demos, and Q&A
+- [Contributing Guide](https://docs.orrery.dev/docs/contributing): How to contribute code, docs, and bug reports
+- [Code of Conduct](https://docs.orrery.dev/docs/code_of_conduct): Community standards for respectful collaboration
+- [GitHub](https://github.com/Dxlxz/orrery): Source code, issues, and pull requests
+
+## Optional
+
+- [Release Notes](https://docs.orrery.dev/docs/releases): Orrery Core (OSS) release history with version notes and breaking changes
+- [GraphQL Schema Reference](https://docs.orrery.dev/docs/graphql/queries): Full schema definitions
+- [Orrery Actions](https://docs.orrery.dev/docs/act-on-metadata): Event-driven automation framework
+- [Logical Models](https://docs.orrery.dev/docs/features/feature-guides/logical-models/overview)
+- [Iceberg Catalog](https://docs.orrery.dev/docs/iceberg-catalog)
+

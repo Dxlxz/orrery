@@ -1,0 +1,12 @@
+namespace com.linkedin.metadata.aspect
+
+import com.linkedin.metadata.key.OrreryRetentionKey
+import com.linkedin.retention.OrreryRetentionConfig
+
+/**
+ * A union of all supported metadata aspects for a Orrery access policy.
+ */
+typeref OrreryRetentionAspect = union[
+    OrreryRetentionKey,
+    OrreryRetentionConfig
+]

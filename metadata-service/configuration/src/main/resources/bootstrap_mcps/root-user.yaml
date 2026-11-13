@@ -1,0 +1,17 @@
+- entityUrn: urn:li:corpuser:orrery
+  entityType: corpuser
+  aspectName: corpUserInfo
+  changeType: UPSERT
+  aspect:
+    active: true
+    displayName: Orrery
+    title: Orrery
+    system: true
+- entityUrn: urn:li:corpuser:orrery
+  entityType: corpuser
+  aspectName: corpUserEditableInfo
+  changeType: CREATE
+  aspect:
+    teams: []
+    skills: []
+    pictureLink: "https://raw.githubusercontent.com/Dxlxz/orrery/master/orrery-web-react/src/images/default_avatar.png"

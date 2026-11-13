@@ -1,0 +1,6 @@
+{
+    "updates.defaultTitle": "Orrery Updates: {{month}}",
+    "updates.defaultCtaText": "Explore Orrery Cloud {{version}}",
+    "updates.moreInThisRelease": "More in this release",
+    "upload.failedTitle": "Upload Failed"
+}
