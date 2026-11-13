@@ -1,0 +1,9 @@
+id: foogroup@orrery.dev
+display_name: Foo Group
+owners:
+  - orrery
+members:
+  - bar@orrery.dev # refer to a user either by id or by urn
+  - id: joe@orrery.dev # inline specification of user
+    slack: "@joe_shmoe"
+    display_name: "Joe's Hub"

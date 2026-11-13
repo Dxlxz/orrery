@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Query
+ */
+@Aspect = {
+  "name": "orreryOpenAPISchemaKey"
+}
+record OrreryOpenAPISchemaKey {
+  /**
+  * A unique id for the Orrery OpenAPI schema.
+  */
+  id: string
+}

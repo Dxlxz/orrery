@@ -1,0 +1,8 @@
+namespace com.orrery.test.testing
+
+/**
+ * For unit tests
+ */
+typeref DeltaUnionAlias = union[
+  entity: EntityDeltaAlias
+]

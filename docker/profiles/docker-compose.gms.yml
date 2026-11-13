@@ -1,0 +1,966 @@
+#################################
+# Common Environment Variables
+#################################
+x-primary-datastore-mysql-env: &primary-datastore-mysql-env
+  EBEAN_DATASOURCE_USERNAME: ${ORRERY_EBEAN_DATASOURCE_ROOT_USERNAME:-root}
+  EBEAN_DATASOURCE_PASSWORD: ${ORRERY_EBEAN_DATASOURCE_ROOT_PASSWORD:-orrery}
+  EBEAN_DATASOURCE_HOST: mysql:3306
+  EBEAN_DATASOURCE_URL: 'jdbc:mysql://mysql:3306/orrery?verifyServerCertificate=false&useSSL=true&useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true&enabledTLSProtocols=TLSv1.2'
+  EBEAN_DATASOURCE_DRIVER: com.mysql.jdbc.Driver
+
+x-primary-datastore-postgres-env: &primary-datastore-postgres-env
+  EBEAN_DATASOURCE_USERNAME: ${ORRERY_EBEAN_DATASOURCE_ROOT_USERNAME:-orrery}
+  EBEAN_DATASOURCE_PASSWORD: ${ORRERY_EBEAN_DATASOURCE_ROOT_PASSWORD:-orrery}
+  EBEAN_DATASOURCE_HOST: postgres:5432
+  EBEAN_DATASOURCE_URL: 'jdbc:postgresql://postgres:5432/orrery'
+  EBEAN_DATASOURCE_DRIVER: org.postgresql.Driver
+  EBEAN_POSTGRES_USE_AWS_IAM_AUTH: ${EBEAN_POSTGRES_USE_AWS_IAM_AUTH:-false}
+  ORRERY_PGQUEUE_ENABLED: ${ORRERY_PGQUEUE_ENABLED:-true}
+  ORRERY_PGQUEUE_MAINTENANCE_CRON_ENABLED: ${ORRERY_PGQUEUE_MAINTENANCE_CRON_ENABLED:-true}
+
+x-primary-datastore-cassandra-env: &primary-datastore-cassandra-env
+  CASSANDRA_DATASOURCE_USERNAME: cassandra
+  CASSANDRA_DATASOURCE_PASSWORD: cassandra
+  CASSANDRA_HOSTS: cassandra
+  CASSANDRA_PORT: 9042
+  CASSANDRA_DATASOURCE_HOST: 'cassandra:9042'
+  ENTITY_SERVICE_IMPL: cassandra
+
+x-graph-datastore-neo4j-env: &graph-datastore-neo4j-env
+  GRAPH_SERVICE_IMPL: neo4j
+  NEO4J_HOST: 'http://neo4j:7474'
+  NEO4J_URI: 'bolt://neo4j'
+  NEO4J_USERNAME: neo4j
+  NEO4J_PASSWORD: orrery
+x-graph-datastore-search-env: &graph-datastore-search-env
+  GRAPH_SERVICE_IMPL: elasticsearch
+
+x-search-datastore-opensearch-env: &search-datastore-env
+  ELASTICSEARCH_HOST: search
+  ELASTICSEARCH_PORT: 9200
+  ELASTICSEARCH_PROTOCOL: http
+  ELASTICSEARCH_USE_SSL: ${ELASTICSEARCH_USE_SSL:-false}
+  ELASTICSEARCH_IMPLEMENTATION: opensearch
+
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVER: broker:29092
+  # KAFKA_SCHEMAREGISTRY_URL=http://schema-registry:8081
+  SCHEMA_REGISTRY_TYPE: INTERNAL
+  KAFKA_SCHEMAREGISTRY_URL: http://orrery-gms:8080${ORRERY_GMS_BASE_PATH:-}/schema-registry/api/
+
+x-orrery-quickstart-telemetry-env: &orrery-quickstart-telemetry-env
+  ORRERY_SERVER_TYPE: ${ORRERY_SERVER_TYPE:-quickstart}
+  ORRERY_TELEMETRY_ENABLED: ${ORRERY_TELEMETRY_ENABLED:-true}
+  # OSS usage aggregation + Micrometer flush export
+  USAGE_AGGREGATION_ENABLED: ${USAGE_AGGREGATION_ENABLED:-true}
+  # Faster local flushes so Prometheus smoke waits stay under typical budgets
+  USAGE_AGGREGATION_FLUSH_INTERVAL_SECONDS: ${USAGE_AGGREGATION_FLUSH_INTERVAL_SECONDS:-30}
+  # Align flush windows to the top of the UTC hour (local parity with production cadence)
+  USAGE_AGGREGATION_ALIGNMENT_PERIOD_SECONDS: ${USAGE_AGGREGATION_ALIGNMENT_PERIOD_SECONDS:-3600}
+  # Locally include agent_name so usage smoke probes isolate additive cells per probe.
+  USAGE_AGGREGATION_INCLUDE_AGENT_NAME: ${USAGE_AGGREGATION_INCLUDE_AGENT_NAME:-true}
+
+x-orrery-dev-telemetry-env: &orrery-dev-telemetry-env
+  ORRERY_SERVER_TYPE: ${ORRERY_SERVER_TYPE:-dev}
+  ORRERY_TELEMETRY_ENABLED: ${ORRERY_TELEMETRY_ENABLED:-true}
+  # OSS usage aggregation + Micrometer flush export
+  USAGE_AGGREGATION_ENABLED: ${USAGE_AGGREGATION_ENABLED:-true}
+  # Faster local flushes so Prometheus smoke waits stay under typical budgets
+  USAGE_AGGREGATION_FLUSH_INTERVAL_SECONDS: ${USAGE_AGGREGATION_FLUSH_INTERVAL_SECONDS:-30}
+  # Align flush windows to the top of the UTC hour (local parity with production cadence)
+  USAGE_AGGREGATION_ALIGNMENT_PERIOD_SECONDS: ${USAGE_AGGREGATION_ALIGNMENT_PERIOD_SECONDS:-3600}
+  # Locally include agent_name so usage smoke probes isolate additive cells per probe.
+  USAGE_AGGREGATION_INCLUDE_AGENT_NAME: ${USAGE_AGGREGATION_INCLUDE_AGENT_NAME:-true}
+
+x-orrery-dev-aws-env: &orrery-dev-aws-env
+  AWS_PROFILE:
+  AWS_SDK_LOAD_CONFIG: ${AWS_SDK_LOAD_CONFIG:-1}
+
+x-localstack-env: &localstack-env
+  AWS_ENDPOINT_URL: ${ORRERY_AWS_ENDPOINT_URL:-http://localstack:4566}
+  AWS_ACCESS_KEY_ID: ${ORRERY_AWS_ACCESS_KEY_ID:-test}
+  AWS_SECRET_ACCESS_KEY: ${ORRERY_AWS_ACCESS_KEY_ID:-test}
+  AWS_REGION: ${ORRERY_AWS_REGION:-us-east-1}
+  ORRERY_EXECUTOR_ROLE_ARN: ${ORRERY_EXECUTOR_ROLE_ARN:-arn:aws:iam::000000000000:role/test-role}
+
+x-orrery-common: &orrery-common-env
+  ORRERY_BASE_PATH: ${ORRERY_BASE_PATH:-/}
+  ORRERY_GMS_BASE_PATH: ${ORRERY_GMS_BASE_PATH:-/}
+
+x-orrery-token-authentication-env: &orrery-authentication-env
+  ORRERY_SYSTEM_CLIENT_SECRET: ${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}
+  ORRERY_TOKEN_SERVICE_SIGNING_KEY: ${ORRERY_TOKEN_SERVICE_SIGNING_KEY}
+  ORRERY_TOKEN_SERVICE_SALT: ${ORRERY_TOKEN_SERVICE_SALT}
+#################################
+# System Update
+#################################
+x-orrery-system-update-service: &orrery-system-update-service
+  hostname: orrery-system-update
+  image: ${ORRERY_UPGRADE_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-upgrade}:${ORRERY_UPDATE_VERSION:-${ORRERY_VERSION:-quickstart}}
+  command:
+    - -u
+    - SystemUpdate
+  env_file:
+    - orrery-upgrade/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_SYS_UPDATE_ENV:-empty2.env}
+  environment: &orrery-system-update-env
+    <<: [*primary-datastore-mysql-env, *graph-datastore-search-env, *search-datastore-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+
+    CREATE_USER: ${ORRERY_CREATE_USER:-false}
+    CREATE_USER_USERNAME: ${ORRERY_CREATE_USER_USERNAME:-orrery}
+    CREATE_USER_PASSWORD: ${ORRERY_CREATE_USER_PASSWORD:-orrery}
+    SCHEMA_REGISTRY_SYSTEM_UPDATE: ${SCHEMA_REGISTRY_SYSTEM_UPDATE:-true}
+    SPRING_KAFKA_PROPERTIES_AUTO_REGISTER_SCHEMAS: ${SPRING_KAFKA_PROPERTIES_AUTO_REGISTER_SCHEMAS:-true}
+    SPRING_KAFKA_PROPERTIES_USE_LATEST_VERSION: ${SPRING_KAFKA_PROPERTIES_USE_LATEST_VERSION:-true}
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    ELASTICSEARCH_INDEX_BUILDER_REFRESH_INTERVAL_SECONDS: ${ELASTICSEARCH_INDEX_BUILDER_REFRESH_INTERVAL_SECONDS:-3}
+    # Quickstart and CI keep timeseries and usage at 3s; the product default inside the image is 60s.
+    ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS: ${ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS:-3}
+    ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS: ${ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS:-3}
+    ORRERY_PRECREATE_TOPICS: ${ORRERY_PRECREATE_TOPICS:-true}
+    KAFKA_BOOTSTRAP_SERVER: broker:29092
+    USE_CONFLUENT_SCHEMA_REGISTRY: false
+    ORRERY_SQL_SETUP_ENABLED: ${ORRERY_SQL_SETUP_ENABLED:-true}
+    # Same value GMS gets below (orrery-gms-env) — the VIEW_ALL_QUERIES backfill migration this
+    # container runs (BackfillViewAllQueriesPrivilegeStep) needs to know whether view authorization
+    # is enabled to restrict itself to system policies.
+    VIEW_AUTHORIZATION_ENABLED: ${VIEW_AUTHORIZATION_ENABLED:-false}
+    # Optional log shipping to a Loki-push-compatible aggregator (dormant when empty)
+    LOG_AGGREGATOR_ENDPOINT: ${LOG_AGGREGATOR_ENDPOINT:-}
+    PARTITIONS: ${ORRERY_PARTITIONS:-3}
+    
+  volumes:
+    - ${HOME}/.orrery/plugins:/etc/orrery/plugins
+  labels:
+    orrery_setup_job: true
+
+x-orrery-system-update-service-dev: &orrery-system-update-service-dev
+  <<: *orrery-system-update-service
+  image: ${ORRERY_UPGRADE_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-upgrade}:${ORRERY_UPDATE_VERSION:-${ORRERY_VERSION:-debug}}
+  ports:
+    - ${ORRERY_MAPPED_UPGRADE_DEBUG_PORT:-5003}:5003
+  environment: &orrery-system-update-dev-env
+    <<: [*orrery-dev-telemetry-env, *orrery-system-update-env, *orrery-dev-aws-env]
+    REPROCESS_DEFAULT_BROWSE_PATHS_V2: ${REPROCESS_DEFAULT_BROWSE_PATHS_V2:-false}
+    JAVA_TOOL_OPTIONS: '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5003'
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+  volumes:
+    - ../../orrery-upgrade/build/libs/:/orrery/orrery-upgrade/bin/
+    - ../../metadata-models/src/main/resources/:/orrery/orrery-gms/resources
+    - ${HOME}/.orrery/plugins:/etc/orrery/plugins
+    - ${HOME}/.aws:/home/orrery/.aws:ro
+    - ${HOME}/.aws/sso/cache:/home/orrery/.aws/sso/cache:rw
+
+#################################
+# GMS
+#################################
+x-orrery-gms-service: &orrery-gms-service
+  hostname: orrery-gms
+  image: ${ORRERY_GMS_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-gms}:${ORRERY_GMS_VERSION:-${ORRERY_VERSION:-quickstart}}
+  ports:
+    - ${ORRERY_MAPPED_GMS_PORT:-8080}:8080
+    - ${ORRERY_MAPPED_GMS_MANAGEMENT_PORT:-4319}:4319
+  expose:
+    - 4319
+  env_file:
+    - orrery-gms/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_GMS_ENV:-empty2.env}
+  environment: &orrery-gms-env
+    <<: [*primary-datastore-mysql-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+    ALTERNATE_MCP_VALIDATION: ${ALTERNATE_MCP_VALIDATION:-true}
+    STRICT_URN_VALIDATION_ENABLED: ${STRICT_URN_VALIDATION_ENABLED:-true}
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    THEME_V2_DEFAULT: ${THEME_V2_DEFAULT:-true}
+    METADATA_SERVICE_AUTH_ENABLED: ${METADATA_SERVICE_AUTH_ENABLED:-true}
+    SHOW_HAS_SIBLINGS_FILTER: ${SHOW_HAS_SIBLINGS_FILTER:-true}
+    SHOW_SEARCH_BAR_AUTOCOMPLETE_REDESIGN: ${SHOW_SEARCH_BAR_AUTOCOMPLETE_REDESIGN:-true}
+    SEARCH_BAR_API_VARIANT: ${SEARCH_BAR_API_VARIANT:-SEARCH_ACROSS_ENTITIES}
+    POLICY_CACHE_REFRESH_INTERVAL_SECONDS: ${POLICY_CACHE_REFRESH_INTERVAL_SECONDS:-120}
+    ORRERY_OBJECT_STORAGE_URI: ${ORRERY_OBJECT_STORAGE_URI:-file:///tmp/orrery-object-storage}
+    SHOW_HOME_PAGE_REDESIGN: ${SHOW_HOME_PAGE_REDESIGN:-true}
+    MCL_CONSUMER_BATCH_ENABLED: ${MCL_CONSUMER_BATCH_ENABLED:-true}
+    MCP_CONSUMER_BATCH_ENABLED: ${MCP_CONSUMER_BATCH_ENABLED:-true}
+    DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+    VIEW_AUTHORIZATION_ENABLED: ${VIEW_AUTHORIZATION_ENABLED:-false}
+    # Same values as system-update, which writes them onto the index. Unset, these stay at 3s
+    # instead of the image default of 60s.
+    ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS: ${ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS:-3}
+    ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS: ${ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS:-3}
+    # Optional log shipping to a Loki-push-compatible aggregator (dormant when empty)
+    LOG_AGGREGATOR_ENDPOINT: ${LOG_AGGREGATOR_ENDPOINT:-}
+  healthcheck:
+    test: curl -sS --fail http://orrery-gms:${ORRERY_GMS_PORT:-8080}/health
+    start_period: 90s
+    interval: 1s
+    retries: 3
+    timeout: 5s
+  volumes:
+    - ${HOME}/.orrery/plugins:/etc/orrery/plugins
+    - ${HOME}/.orrery/search:/etc/orrery/search
+  labels:
+    io.orreryproject.orrery.component: "gms"
+
+x-orrery-gms-service-dev: &orrery-gms-service-dev
+  <<: *orrery-gms-service
+  image: ${ORRERY_GMS_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-gms}:${ORRERY_GMS_VERSION:-${ORRERY_VERSION:-debug}}
+  ports:
+    - ${ORRERY_MAPPED_GMS_DEBUG_PORT:-5001}:5001
+    - ${ORRERY_MAPPED_GMS_PORT:-8080}:8080
+    - ${ORRERY_MAPPED_GMS_MANAGEMENT_PORT:-4319}:4319
+  env_file:
+    - orrery-gms/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_GMS_ENV:-empty2.env}
+  environment: &orrery-gms-dev-env
+    <<: [*orrery-dev-telemetry-env, *orrery-gms-env, *orrery-dev-aws-env]
+    JAVA_TOOL_OPTIONS: '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001 -Dlogging.appender.debug_file.level=${GMS_LOGGING_APPENDER_DEBUG_FILE_LEVEL:-DEBUG}'
+    SEARCH_SERVICE_ENABLE_CACHE: false
+    LINEAGE_SEARCH_CACHE_ENABLED: false
+    SHOW_BROWSE_V2: true
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    METADATA_SERVICE_AUTH_ENABLED: ${METADATA_SERVICE_AUTH_ENABLED:-true}
+    DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+    ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_ENABLED: ${ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_ENABLED:-true}
+    ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_WARN_SIZE_BYTES: ${ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_WARN_SIZE_BYTES:-1048576}
+    ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_MAX_SIZE_BYTES: ${ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_MAX_SIZE_BYTES:-1572864}
+    ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_OVERSIZED_REMEDIATION: ${ORRERY_VALIDATION_ASPECT_SIZE_PRE_PATCH_OVERSIZED_REMEDIATION:-IGNORE}
+    ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_ENABLED: ${ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_ENABLED:-true}
+    ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_WARN_SIZE_BYTES: ${ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_WARN_SIZE_BYTES:-1048576}
+    ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_MAX_SIZE_BYTES: ${ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_MAX_SIZE_BYTES:-1572864}
+    ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_OVERSIZED_REMEDIATION: ${ORRERY_VALIDATION_ASPECT_SIZE_POST_PATCH_OVERSIZED_REMEDIATION:-IGNORE}
+  volumes:
+    - ./orrery-gms/start.sh:/orrery/orrery-gms/scripts/start.sh
+    - ./monitoring/client-prometheus-config.yaml:/orrery/orrery-gms/scripts/prometheus-config.yaml
+    - ../../metadata-models/src/main/resources/:/orrery/orrery-gms/resources
+    - ../../metadata-service/war/build/libs/:/orrery/orrery-gms/bin
+    - ${HOME}/.orrery/plugins:/etc/orrery/plugins
+    - ${HOME}/.orrery/search:/etc/orrery/search
+    - ${HOME}/.aws:/home/orrery/.aws:ro
+    - ${HOME}/.aws/sso/cache:/home/orrery/.aws/sso/cache:rw
+
+
+#################################
+# MAE Consumer
+#################################
+x-orrery-mae-consumer-service: &orrery-mae-consumer-service
+  hostname: orrery-mae-consumer
+  image: ${ORRERY_MAE_CONSUMER_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-mae-consumer}:${ORRERY_MAE_VERSION:-${ORRERY_VERSION:-quickstart}}
+  ports:
+    - ${ORRERY_MAPPED_MAE_CONSUMER_PORT:-9091}:9091
+  expose:
+    - 4319
+  env_file:
+    - orrery-mae-consumer/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_MAE_ENV:-empty2.env}
+  environment: &orrery-mae-consumer-env
+    <<: [*primary-datastore-mysql-env, *graph-datastore-search-env, *search-datastore-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    MCL_CONSUMER_BATCH_ENABLED: ${MCL_CONSUMER_BATCH_ENABLED:-true}
+    KAFKA_LISTENER_CONCURRENCY: ${KAFKA_LISTENER_CONCURRENCY:-1}
+    # Optional log shipping to a Loki-push-compatible aggregator (dormant when empty)
+    LOG_AGGREGATOR_ENDPOINT: ${LOG_AGGREGATOR_ENDPOINT:-}
+
+x-orrery-mae-consumer-service-dev: &orrery-mae-consumer-service-dev
+  <<: *orrery-mae-consumer-service
+  image: ${ORRERY_MAE_CONSUMER_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-mae-consumer}:${ORRERY_MAE_VERSION:-${ORRERY_VERSION:-debug}}
+  environment: &orrery-mae-consumer-dev-env
+    <<: [*orrery-dev-telemetry-env, *orrery-mae-consumer-env]
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+  volumes:
+    - ./orrery-mae-consumer/start.sh:/orrery/orrery-mae-consumer/scripts/start.sh
+    - ../../metadata-models/src/main/resources/:/orrery/orrery-mae-consumer/resources
+    - ../../metadata-jobs/mae-consumer-job/build/libs/:/orrery/orrery-mae-consumer/bin/
+    - ./monitoring/client-prometheus-config.yaml:/orrery/orrery-mae-consumer/scripts/prometheus-config.yaml
+
+#################################
+# MCE Consumer
+#################################
+x-orrery-mce-consumer-service: &orrery-mce-consumer-service
+  hostname: orrery-mce-consumer
+  image: ${ORRERY_MCE_CONSUMER_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-mce-consumer}:${ORRERY_MCE_VERSION:-${ORRERY_VERSION:-quickstart}}
+  ports:
+    - ${ORRERY_MAPPED_MCE_CONSUMER_PORT:-9090}:9090
+  expose:
+    - 4319
+  env_file:
+    - orrery-mce-consumer/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_MCE_ENV:-empty2.env}
+  environment: &orrery-mce-consumer-env
+    <<: [*primary-datastore-mysql-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+    ALTERNATE_MCP_VALIDATION: ${ALTERNATE_MCP_VALIDATION:-true}
+    STRICT_URN_VALIDATION_ENABLED: ${STRICT_URN_VALIDATION_ENABLED:-true}
+    KAFKA_LISTENER_CONCURRENCY: ${KAFKA_LISTENER_CONCURRENCY:-1}
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    MCP_CONSUMER_BATCH_ENABLED: ${MCP_CONSUMER_BATCH_ENABLED:-true}
+    # Optional log shipping to a Loki-push-compatible aggregator (dormant when empty)
+    LOG_AGGREGATOR_ENDPOINT: ${LOG_AGGREGATOR_ENDPOINT:-}
+
+x-orrery-mce-consumer-service-dev: &orrery-mce-consumer-service-dev
+  <<: *orrery-mce-consumer-service
+  image: ${ORRERY_MCE_CONSUMER_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-mce-consumer}:${ORRERY_MCE_VERSION:-${ORRERY_VERSION:-debug}}
+  ports:
+    - ${ORRERY_MAPPED_MCE_CONSUMER_PORT:-9090}:9090
+    - ${ORRERY_MAPPED_MCE_DEBUG_PORT:-5009}:5009
+  environment: &orrery-mce-consumer-env-dev
+    <<: [*orrery-dev-telemetry-env, *orrery-mce-consumer-env]
+    ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+    JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009"
+  volumes:
+    - ./orrery-mce-consumer/start.sh:/orrery/orrery-mce-consumer/scripts/start.sh
+    - ../../metadata-jobs/mce-consumer-job/build/libs/:/orrery/orrery-mce-consumer/bin
+    - ./monitoring/client-prometheus-config.yaml:/orrery/orrery-mce-consumer/scripts/prometheus-config.yaml
+
+services:
+  #################################
+  # System Update (runs SqlSetup when ORRERY_SQL_SETUP_ENABLED=true, then SystemUpdate incl. BuildIndices)
+  #################################
+  system-update-quickstart:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart
+      - quickstart-storage
+      - quickstart-consumers
+      - quickstart-frontend
+      - quickstart-backend
+      - quickstart-opensearch2
+    environment:
+      <<: *orrery-system-update-env
+      ORRERY_SQL_SETUP_ENABLED: 'true'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+  system-update-quickstart-cdc:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-consumers-cdc
+    environment:
+      <<: *orrery-system-update-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      CDC_USER: ${CDC_USER:-orrery_cdc}
+      CDC_PASSWORD: ${CDC_PASSWORD:-orrery_cdc}
+      ORRERY_DB_NAME: ${ORRERY_DB_NAME:-orrery}
+      DEBEZIUM_PLUGIN_NAME: pgoutput
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_started
+  system-update-quickstart-cassandra:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-cassandra
+    environment:
+      <<: [*primary-datastore-cassandra-env, *graph-datastore-neo4j-env, *orrery-system-update-env]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      cassandra-setup:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+  system-update-quickstart-postgres:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-postgres
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-system-update-env]
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-quickstart-postgres-consumers:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-postgres-consumers
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-system-update-env]
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-quickstart-postgres-cdc:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-postgres-cdc
+    environment: &system-update-quickstart-postgres-cdc-env
+      <<: [*primary-datastore-postgres-env, *orrery-system-update-env]
+      DEBEZIUM_CONNECTOR_CLASS: io.debezium.connector.postgresql.PostgresConnector
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      CDC_USER: ${CDC_USER:-orrery_cdc}
+      CDC_PASSWORD: ${CDC_PASSWORD:-orrery_cdc}
+      ORRERY_DB_NAME: ${ORRERY_DB_NAME:-orrery}
+      CDC_DB_TYPE: postgres
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-kafka}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_started
+  system-update-quickstart-opensearch3:
+    <<: *orrery-system-update-service
+    profiles:
+      - quickstart-opensearch3
+    environment:
+      <<: *orrery-system-update-env
+      ORRERY_SQL_SETUP_ENABLED: 'true'
+      ELASTICSEARCH_SHIM_ENGINE_TYPE: OPENSEARCH_3
+      ELASTICSEARCH_SHIM_AUTO_DETECT: 'false'
+      ELASTICSEARCH_INDEX_DOC_IDS_SCHEMA_FIELD_HASH_ID_ENABLED: 'true'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch3:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+  system-update-debug: &system-update-debug
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug
+      - debug-min
+      - debug-backend
+      - debug-backend-aws
+      - debug-opensearch2
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-debug-aws: &system-update-debug-aws
+    <<: *orrery-system-update-service-dev
+    environment:
+      <<: [*orrery-system-update-dev-env, *localstack-env]
+    profiles:
+      - debug-backend-aws
+      - debug-aws
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-debug-consumers: # for consistent naming based on profile
+    <<: *system-update-debug
+    profiles:
+      - debug-consumers
+  system-update-debug-consumers-cdc:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-consumers-cdc
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_started
+    environment:
+      <<: *orrery-system-update-dev-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      CDC_USER: ${CDC_USER:-orrery_cdc}
+      CDC_PASSWORD: ${CDC_PASSWORD:-orrery_cdc}
+      ORRERY_DB_NAME: ${ORRERY_DB_NAME:-orrery}
+      DEBEZIUM_CONFIG_OVERRIDE: mclProcessing.cdcSource.debeziumConfig.mysqlConfig
+  system-update-debug-elasticsearch:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-elasticsearch
+    environment:
+      <<: *orrery-system-update-dev-env
+      ELASTICSEARCH_IMPLEMENTATION: elasticsearch
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+  system-update-debug-opensearch3:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-opensearch3
+    environment:
+      <<: *orrery-system-update-dev-env
+      ELASTICSEARCH_SHIM_ENGINE_TYPE: OPENSEARCH_3
+      ELASTICSEARCH_SHIM_AUTO_DETECT: 'false'
+      ELASTICSEARCH_INDEX_DOC_IDS_SCHEMA_FIELD_HASH_ID_ENABLED: 'true'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      opensearch3:
+        condition: service_healthy
+      kafka-broker:
+        condition: service_healthy
+  system-update-debug-postgres:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-postgres
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-system-update-dev-env]
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-debug-postgres-consumers:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-postgres-consumers
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-system-update-dev-env]
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  system-update-debug-postgres-cdc:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-postgres-cdc
+    environment:
+      <<: *system-update-quickstart-postgres-cdc-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_started
+  system-update-debug-cassandra:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-cassandra
+    environment:
+      <<: [*primary-datastore-cassandra-env, *orrery-system-update-dev-env]
+    depends_on:
+      cassandra-setup:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+  system-update-debug-neo4j:
+    <<: *orrery-system-update-service-dev
+    profiles:
+      - debug-neo4j
+    environment:
+      <<: [*graph-datastore-neo4j-env, *orrery-system-update-dev-env]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  #################################
+  # GMS
+  #################################
+  orrery-gms-quickstart:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart
+      - quickstart-backend
+      - quickstart-opensearch2
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-opensearch3:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-opensearch3
+    environment:
+      <<: *orrery-gms-env
+      ELASTICSEARCH_SHIM_ENGINE_TYPE: OPENSEARCH_3
+      ELASTICSEARCH_SHIM_AUTO_DETECT: 'false'
+      ELASTICSEARCH_INDEX_DOC_IDS_SCHEMA_FIELD_HASH_ID_ENABLED: 'true'
+    depends_on:
+      system-update-quickstart-opensearch3:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-cassandra:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-cassandra
+    environment:
+      <<: [*primary-datastore-cassandra-env, *graph-datastore-neo4j-env, *orrery-gms-env]
+    depends_on:
+      system-update-quickstart-cassandra:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-postgres:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-postgres
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-env]
+      DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      SKIP_KAFKA_CHECK: true
+    depends_on:
+      system-update-quickstart-postgres:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-postgres-consumers:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-postgres-consumers
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-env]
+      MAE_CONSUMER_ENABLED: false
+      MCE_CONSUMER_ENABLED: false
+      DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      SKIP_KAFKA_CHECK: true
+    depends_on:
+      system-update-quickstart-postgres-consumers:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-postgres-cdc:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-postgres-cdc
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-env]
+      DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+      DEBEZIUM_CONNECTOR_CLASS: io.debezium.connector.postgresql.PostgresConnector
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      CDC_DB_TYPE: postgres
+      MAE_CONSUMER_ENABLED: false
+      MCE_CONSUMER_ENABLED: false
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-kafka}
+    depends_on:
+      system-update-quickstart-postgres-cdc:
+        condition: service_completed_successfully
+
+  orrery-gms-quickstart-consumers:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-consumers
+    environment: &orrery-gms-quickstart-consumers-env
+      <<: *orrery-gms-env
+      MAE_CONSUMER_ENABLED: false
+      MCE_CONSUMER_ENABLED: false
+      DEV_TOOLING_ENABLED: ${DEV_TOOLING_ENABLED:-false}
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+  orrery-gms-quickstart-consumers-cdc:
+    <<: *orrery-gms-service
+    profiles:
+      - quickstart-consumers-cdc
+    environment:
+      <<: *orrery-gms-quickstart-consumers-env
+      DEBEZIUM_CONNECTOR_CLASS: io.debezium.connector.postgresql.PostgresConnector
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    depends_on:
+      system-update-quickstart-cdc:
+        condition: service_completed_successfully
+  orrery-gms-debug:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug
+      - debug-backend
+      - debug-opensearch2
+    depends_on:
+      system-update-debug:
+        condition: service_completed_successfully
+  orrery-gms-debug-aws:
+    <<: *orrery-gms-service-dev
+    environment:
+      <<: [*localstack-env, *orrery-gms-dev-env]
+    profiles:
+      - debug-backend-aws
+      - debug-aws
+    depends_on:
+      system-update-debug-aws:
+        condition: service_completed_successfully
+  orrery-gms-debug-min:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-min
+      - debug-backend
+    depends_on:
+      system-update-debug:
+        condition: service_completed_successfully
+  orrery-gms-debug-postgres:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-postgres
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-dev-env]
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      SKIP_KAFKA_CHECK: true
+    depends_on:
+      system-update-debug-postgres:
+        condition: service_completed_successfully
+  orrery-gms-debug-postgres-consumers:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-postgres-consumers
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-dev-env]
+      MAE_CONSUMER_ENABLED: false
+      MCE_CONSUMER_ENABLED: false
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      SKIP_KAFKA_CHECK: true
+    depends_on:
+      system-update-debug-postgres-consumers:
+        condition: service_completed_successfully
+  orrery-gms-debug-postgres-cdc:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-postgres-cdc
+    environment:
+      <<: [*primary-datastore-postgres-env, *orrery-gms-dev-env]
+      DEBEZIUM_CONNECTOR_CLASS: io.debezium.connector.postgresql.PostgresConnector
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      CDC_USER: ${CDC_USER:-orrery_cdc}
+      CDC_PASSWORD: ${CDC_PASSWORD:-orrery_cdc}
+      ORRERY_DB_NAME: ${ORRERY_DB_NAME:-orrery}
+      CDC_DB_TYPE: postgres
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-kafka}
+    depends_on:
+      system-update-debug-postgres-cdc:
+        condition: service_completed_successfully
+  orrery-gms-debug-cassandra:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-cassandra
+    environment:
+      <<: [*primary-datastore-cassandra-env, *orrery-gms-dev-env]
+    depends_on:
+      system-update-debug-cassandra:
+        condition: service_completed_successfully
+  orrery-gms-debug-consumers:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-consumers
+    environment: &orrery-gms-debug-consumers-env
+      <<: *orrery-gms-dev-env
+      MAE_CONSUMER_ENABLED: false
+      MCE_CONSUMER_ENABLED: false
+    depends_on:
+      system-update-debug-consumers:
+        condition: service_completed_successfully
+  orrery-gms-debug-consumers-cdc:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-consumers-cdc
+    environment:
+      <<: *orrery-gms-debug-consumers-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    depends_on:
+      system-update-debug-consumers-cdc:
+        condition: service_completed_successfully
+  orrery-gms-debug-neo4j:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-neo4j
+    environment:
+      <<: [*graph-datastore-neo4j-env, *orrery-gms-dev-env]
+    depends_on:
+      system-update-debug-neo4j:
+        condition: service_completed_successfully
+  orrery-gms-debug-elasticsearch:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-elasticsearch
+    environment:
+      <<: *orrery-gms-dev-env
+      ELASTICSEARCH_IMPLEMENTATION: elasticsearch
+    depends_on:
+      system-update-debug-elasticsearch:
+        condition: service_completed_successfully
+  orrery-gms-debug-opensearch3:
+    <<: *orrery-gms-service-dev
+    profiles:
+      - debug-opensearch3
+    environment:
+      <<: *orrery-gms-dev-env
+      ELASTICSEARCH_SHIM_ENGINE_TYPE: OPENSEARCH_3
+      ELASTICSEARCH_SHIM_AUTO_DETECT: 'false'
+      ELASTICSEARCH_INDEX_DOC_IDS_SCHEMA_FIELD_HASH_ID_ENABLED: 'true'
+    depends_on:
+      system-update-debug-opensearch3:
+        condition: service_completed_successfully
+  #################################
+  # MAE Consumer
+  #################################
+  orrery-mae-consumer-quickstart-consumers:
+    <<: *orrery-mae-consumer-service
+    profiles:
+      - quickstart-consumers
+    depends_on:
+      orrery-gms-quickstart-consumers:
+        condition: service_healthy
+  orrery-mae-consumer-debug-consumers:
+    <<: *orrery-mae-consumer-service-dev
+    profiles:
+      - debug-consumers
+    depends_on:
+      orrery-gms-debug-consumers:
+        condition: service_healthy
+  orrery-mae-consumer-quickstart-consumers-cdc:
+    <<: *orrery-mae-consumer-service
+    environment:
+      <<: *orrery-mae-consumer-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    profiles:
+      - quickstart-consumers-cdc
+    depends_on:
+      orrery-gms-quickstart-consumers-cdc:
+        condition: service_healthy
+  orrery-mae-consumer-quickstart-postgres-cdc:
+    <<: *orrery-mae-consumer-service
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-kafka}
+    profiles:
+      - quickstart-postgres-cdc
+    depends_on:
+      orrery-gms-quickstart-postgres-cdc:
+        condition: service_healthy
+  orrery-mae-consumer-quickstart-postgres-consumers:
+    <<: *orrery-mae-consumer-service
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env]
+      ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      MCL_CONSUMER_BATCH_ENABLED: ${MCL_CONSUMER_BATCH_ENABLED:-true}
+      SKIP_KAFKA_CHECK: true
+      MAE_CONSUMER_ENABLED: true
+    profiles:
+      - quickstart-postgres-consumers
+    depends_on:
+      orrery-gms-quickstart-postgres-consumers:
+        condition: service_healthy
+
+  orrery-mae-consumer-debug-consumers-cdc:
+    <<: *orrery-mae-consumer-service-dev
+    environment:
+      <<: *orrery-mae-consumer-dev-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    profiles:
+      - debug-consumers-cdc
+    depends_on:
+      orrery-gms-debug-consumers-cdc:
+        condition: service_healthy
+  orrery-mae-consumer-debug-postgres-consumers:
+    <<: *orrery-mae-consumer-service-dev
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-dev-telemetry-env, *kafka-env, *orrery-common-env]
+      ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      MCL_CONSUMER_BATCH_ENABLED: ${MCL_CONSUMER_BATCH_ENABLED:-true}
+      SKIP_KAFKA_CHECK: true
+      MAE_CONSUMER_ENABLED: true
+    profiles:
+      - debug-postgres-consumers
+    depends_on:
+      orrery-gms-debug-postgres-consumers:
+        condition: service_healthy
+
+  #################################
+  # MCE Consumer
+  #################################
+  orrery-mce-consumer-quickstart-consumers:
+    <<: *orrery-mce-consumer-service
+    profiles:
+      - quickstart-consumers
+    depends_on:
+      orrery-gms-quickstart-consumers:
+        condition: service_healthy
+  orrery-mce-consumer-quickstart-consumers-cdc:
+    <<: *orrery-mce-consumer-service
+    environment:
+      <<: *orrery-mce-consumer-env
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    profiles:
+      - quickstart-consumers-cdc
+    depends_on:
+      orrery-gms-quickstart-consumers-cdc:
+        condition: service_healthy
+  orrery-mce-consumer-quickstart-postgres-consumers-cdc:
+    <<: *orrery-mce-consumer-service
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-kafka}
+    profiles:
+      - quickstart-postgres-cdc
+    depends_on:
+      orrery-gms-quickstart-postgres-cdc:
+        condition: service_healthy
+  orrery-mce-consumer-quickstart-postgres-consumers:
+    <<: *orrery-mce-consumer-service
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-quickstart-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+      ALTERNATE_MCP_VALIDATION: ${ALTERNATE_MCP_VALIDATION:-true}
+      STRICT_URN_VALIDATION_ENABLED: ${STRICT_URN_VALIDATION_ENABLED:-true}
+      ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      MCP_CONSUMER_BATCH_ENABLED: ${MCP_CONSUMER_BATCH_ENABLED:-true}
+      SKIP_KAFKA_CHECK: true
+      MCE_CONSUMER_ENABLED: true
+    profiles:
+      - quickstart-postgres-consumers
+    depends_on:
+      orrery-gms-quickstart-postgres-consumers:
+        condition: service_healthy
+
+  orrery-mce-consumer-debug-consumers:
+    <<: *orrery-mce-consumer-service-dev
+    profiles:
+      - debug-consumers
+    depends_on:
+      orrery-gms-debug-consumers:
+        condition: service_healthy
+  orrery-mce-consumer-debug-consumers-cdc:
+    <<: *orrery-mce-consumer-service-dev
+    profiles:
+      - debug-consumers-cdc
+    environment:
+      <<: *orrery-mce-consumer-env-dev
+      CDC_MCL_PROCESSING_ENABLED: true
+      CDC_CONFIGURE_SOURCE: true
+    depends_on:
+      orrery-gms-debug-consumers-cdc:
+        condition: service_healthy
+  orrery-mce-consumer-debug-postgres-consumers:
+    <<: *orrery-mce-consumer-service-dev
+    environment:
+      <<: [*primary-datastore-postgres-env, *graph-datastore-search-env, *search-datastore-env, *orrery-dev-telemetry-env, *kafka-env, *orrery-common-env, *orrery-authentication-env]
+      ALTERNATE_MCP_VALIDATION: ${ALTERNATE_MCP_VALIDATION:-true}
+      STRICT_URN_VALIDATION_ENABLED: ${STRICT_URN_VALIDATION_ENABLED:-true}
+      ENTITY_VERSIONING_ENABLED: ${ENTITY_VERSIONING_ENABLED:-true}
+      ORRERY_MESSAGING_TRANSPORT: ${ORRERY_MESSAGING_TRANSPORT:-pgqueue}
+      MCP_CONSUMER_BATCH_ENABLED: ${MCP_CONSUMER_BATCH_ENABLED:-true}
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009"
+      MCE_CONSUMER_ENABLED: true
+    profiles:
+      - debug-postgres-consumers
+    depends_on:
+      orrery-gms-debug-postgres-consumers:
+        condition: service_healthy

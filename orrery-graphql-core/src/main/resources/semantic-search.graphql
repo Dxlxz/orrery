@@ -1,0 +1,13 @@
+# Semantic Search endpoints for Orrery
+
+extend type Query {
+  """
+  Full text semantic search against a specific Orrery Entity Type
+  """
+  semanticSearch(input: SearchInput!): SearchResults
+
+  """
+  Semantic search across Orrery entities
+  """
+  semanticSearchAcrossEntities(input: SearchAcrossEntitiesInput!): SearchResults
+}

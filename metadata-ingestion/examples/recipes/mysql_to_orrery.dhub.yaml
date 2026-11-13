@@ -1,0 +1,15 @@
+---
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/mysql for complete documentation
+source:
+  type: "mysql"
+  config:
+    host_port: localhost:3306
+    database: orrery
+    username: orrery
+    password: orrery
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

@@ -1,0 +1,5 @@
+scan:
+  skip-dirs:
+    # Skip Python uv cache directories to avoid duplicate vulnerability reports in upstreams
+    - "/home/orrery/.cache/uv/**/pyspark/**/jars/**"
+    - "/home/orrery/.cache/uv/**/moto/moto_proxy/**"

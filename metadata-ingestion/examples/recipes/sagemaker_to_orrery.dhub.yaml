@@ -1,0 +1,13 @@
+# in this example, AWS creds are detected automatically
+
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/sagemaker/ for complete documentation
+source:
+  type: sagemaker
+  config:
+    aws_region: "us-west-2"
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

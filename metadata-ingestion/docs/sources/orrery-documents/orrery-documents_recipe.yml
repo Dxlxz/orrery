@@ -1,0 +1,8 @@
+source:
+  type: orrery-documents
+  config:
+    # Minimal configuration - uses smart defaults
+    # Automatically connects to Orrery using ORRERY_GMS_URL and ORRERY_GMS_TOKEN environment variables
+    # Fetches embedding configuration from server
+    # Enables event-driven mode and incremental processing
+    # No sink needed when deploying to Orrery (writes back to itself)

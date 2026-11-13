@@ -1,0 +1,10 @@
+source:
+  type: orrery-apply
+  config:
+    owner_apply:
+      - owner_urn: "urn:li:corpuser:orrery"
+        assets:
+          - "urn:li:dataset:(urn:li:dataPlatform:hive,SampleHiveDataset,PROD)"
+
+sink:
+  # sink configs

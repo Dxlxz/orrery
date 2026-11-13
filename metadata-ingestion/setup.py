@@ -1,0 +1,1545 @@
+# NOTE: This file is being migrated to pyproject.toml (PEP 621).
+# pyproject.toml is now the source of truth for uv lock / uv sync.
+# setup.py is kept during the transition for backward compatibility
+# (data_files with sysconfig.get_path() cannot be expressed in pyproject.toml).
+#
+# After editing dependencies or entry points here, regenerate pyproject.toml:
+#   python scripts/generate_pyproject_deps.py
+#   python scripts/verify_pyproject_equivalence.py
+
+import sysconfig
+from typing import Dict, Set
+
+import setuptools
+
+package_metadata: dict = {}
+with open("./src/orrery/_version.py") as fp:
+    exec(fp.read(), package_metadata)
+
+_version: str = package_metadata["__version__"]
+_self_pin = (
+    f"=={_version}"
+    if not (_version.endswith(("dev0", "dev1")) or "docker" in _version)
+    else ""
+)
+
+base_requirements = {
+    # Our min version of typing_extensions is somewhat constrained by Airflow.
+    "typing_extensions>=4.8.0,<5.0.0",
+    # Actual dependencies.
+    "typing-inspect<0.10.0",
+    "pydantic>=2.4.0,<3.0.0",
+    "mixpanel>=4.9.0,<6.0.0",
+    # Airflow depends on fairly old versions of sentry-sdk, which is why we need to be loose with our constraints.
+    # Note: jaraco.context>=6.1.0 is required for security (GHSA-58pv-8j8x-9vj2: Path traversal
+    # vulnerability), but Airflow 2.x constraints pin jaraco.context to older versions (e.g., 5.3.0).
+    # This constraint is NOT included here to maintain Airflow compatibility.
+    # Security is enforced for Docker image builds via docker/snippets/ingestion/constraints.txt.
+    "sentry-sdk>=1.33.1,<3.0.0",
+    # For JSON logging support via ORRERY_LOG_CONFIG_FILE
+    "python-json-logger>=2.0.0,<5.0.0",
+    # No setuptools bound: Airflow constraint files pin it, so a floor here would
+    # break those installs. The CVE-2026-59890 floor lives in the Docker snippet.
+    # Floor at 2.5.0 — the highest the airflow-plugin CI
+    # tolerates (Airflow 3.0.x/3.1.x pin urllib3==2.5.0, 3.2.x pins 2.6.3). The stronger
+    # >=2.7.0 floor for the remaining CVEs is applied at lock time via pyproject
+    # [tool.uv] constraint-dependencies, keeping this bound Airflow-satisfiable.
+    "urllib3>=2.5.0,<3.0",
+}
+
+gcp_sm_common = {
+    "google-cloud-secret-manager>=2.0.0,<3.0.0",
+}
+
+framework_common = {
+    # Avoiding click 8.2.0 due to https://github.com/pallets/click/issues/2894
+    # CVE-2026-7246 is fixed in 8.3.3. Airflow constraint files pin older click.
+    # Installs that pass those files must relax the pin first. See
+    # docs/lineage/airflow.md#installing-with-airflow-constraints.
+    "click>=8.3.3,<9.0.0",
+    "click-default-group<2.0.0",
+    "PyYAML<7.0.0",
+    "toml>=0.10.0,<=0.10.2",
+    "docker<8.0.0",
+    "expandvars>=0.6.5,<2.0.0",
+    "avro-gen3==0.7.16",
+    # "avro-gen3 @ git+https://github.com/acryldata/avro_gen@master#egg=avro-gen3",
+    # avro has historically made breaking changes, so we have a cautious upper bound.
+    "avro>=1.11.3,<1.13",
+    "python-dateutil>=2.8.0,<3.0.0",
+    # Floor 0.10.0 is allowed so the package can be installed alongside Airflow
+    # 3.2+, whose constraints file pins tabulate==0.10.0. Our usage is limited to
+    # the stable tabulate(data, headers=..., tablefmt=...) call. 0.10.0 requires
+    # Python 3.10+, so 3.9 environments still resolve to 0.9.x.
+    "tabulate<0.11.0",
+    "progressbar2<5.0.0",
+    "psutil>=5.8.0,<8.0.0",
+    "Deprecated<2.0.0",
+    "humanfriendly<11.0.0",
+    "packaging<27.0.0",
+    # CVE-2025-30304, CVE-2025-32442: aiohttp request smuggling; patched releases are >=3.13.3.
+    # Minimum patch is enforced for Docker via docker/snippets/ingestion/constraints.txt only —
+    # do not add a lower bound here: Airflow 2.7.x constraints pin aiohttp==3.8.6 and
+    # airflow-plugin CI installs with -c constraints-3.11.txt (unsatisfiable if we require >=3.13.x).
+    "aiohttp<4",
+    "cached_property<3.0.0",
+    # 3.2.0 is the first release with ijson.parse(use_float=...), which the JSON
+    # schema inferrer relies on to keep numbers as native int/float.
+    "ijson>=3.2.0,<4.0.0",
+    "click-spinner<0.2.0",
+    "requests_file<4.0.0",
+    "jsonref<2.0.0",
+    "jsonschema<5.0.0",
+    # ruamel.yaml 0.19.0 (Dec 31, 2025) made the compiled ruamel.yaml.clib a
+    # mandatory dependency. It was originally capped at <0.19.0 because clib
+    # wheels were unavailable at the time; clib now ships wheels for all
+    # supported Pythons/platforms, and Airflow 3.2's constraints pin
+    # ruamel.yaml==0.19.1, so allow 0.19.x.
+    "ruamel.yaml<0.20.0",
+    # Snappy-compatible codec for pgQueue payload decompression (Java Snappy); not Kafka-specific.
+    "cramjam>=2.8.0,<3.0.0",
+    # The ingestion executor bootstraps per-source venvs by shelling out to
+    # `python -m pip download` (see orrery.executor). uv-created venvs omit pip
+    # by default, so pip must be present in the base environment. This was
+    # previously pulled in transitively via the classification extra; declare it
+    # explicitly here. No upper bound: pip is a system tool.
+    "pip",
+    # Logging backend used by the ingestion executor's subprocess runner
+    # (orrery.executor.execution.runner). Adds no runtime deps on Linux/macOS -
+    # colorama and win32-setctime are win32-only.
+    "loguru>=0.5.0,<1.0.0",
+    # Structured concurrency primitives (task groups, cancel scopes, byte/text
+    # streams) used to supervise ingestion subprocesses in
+    # orrery.executor.execution.runner. Previously only available transitively
+    # via httpx/openai/starlette; declare it explicitly.
+    # CVE-2026-64847 is fixed in 4.14.2. Airflow constraint files pin older anyio.
+    # Installs that pass those files must relax the pin first. See
+    # docs/lineage/airflow.md#installing-with-airflow-constraints.
+    "anyio>=4.14.2,<5.0.0",
+}
+
+rest_common = {
+    "requests<3.0.0",
+    "requests_file<4.0.0",
+    # Required for GraphQL query adaptation and schema introspection
+    "graphql-core>=3.0.0,<4.0.0",
+}
+
+kafka_common = {
+    # Note that confluent_kafka 1.9.0 introduced a hard compatibility break, and
+    # requires librdkafka >=1.9.0. This is generally not an issue, since they
+    # now provide prebuilt wheels for most platforms, including M1 Macs and
+    # Linux aarch64 (e.g. Docker's linux/arm64). Installing confluent_kafka
+    # from source remains a pain.
+    # With the release of 2.8.1, confluent-kafka only released a source distribution,
+    # and no prebuilt wheels.
+    # See https://github.com/confluentinc/confluent-kafka-python/issues/1927
+    # RegisteredSchema#guid is being used and was introduced in 2.10.1 https://github.com/confluentinc/confluent-kafka-python/pull/1978
+    "confluent_kafka[schemaregistry,avro]>=2.15.1,<3.0.0",
+    # We currently require both Avro libraries. The codegen uses avro-python3 (above)
+    # schema parsers at runtime for generating and reading JSON into Python objects.
+    # At the same time, we use Kafka's AvroSerializer, which internally relies on
+    # fastavro for serialization. We do not use confluent_kafka[avro], since it
+    # is incompatible with its own dep on avro-python3.
+    "fastavro>=1.2.0,<2.0.0",
+}
+
+kafka_protobuf = {
+    "networkx>=2.6.2,<4.0.0",
+    # Required to generate protobuf python modules from the schema downloaded from the schema registry
+    # NOTE: potential conflict with feast also depending on grpcio
+    "grpcio>=1.84.0,<2.0.0",
+    # grpcio-tools>=1.63 requires protobuf>=5. We intentionally allow that range.
+    "grpcio-tools>=1.44.0,<2.0.0",
+}
+
+usage_common = {
+    # 0.6.0 fixes CVE-2026-59893, CVE-2026-54284, CVE-2026-71491, CVE-2026-59894 and a
+    # quadratic-CPU DoS in format(reindent=...). Airflow constraints pin sqlparse lower,
+    # but the airflow-plugin pulls no sqlparse-bearing extra, so it is unaffected.
+    "sqlparse>=0.6.0,<1.0.0",
+}
+
+sqlglot_lib = {
+    # We heavily monkeypatch sqlglot.
+    # We used to maintain an orrery-sqlglot fork: https://github.com/tobymao/sqlglot/compare/main...hsheth2:sqlglot:main?expand=1
+    # but no longer do.
+    # 28.0.0+ includes fix for SEMANTIC_VIEW parse infinite loop (https://github.com/tobymao/sqlglot/issues/6287).
+    # 29.0.1+ includes fixes for ClickHouse PRIMARY KEY tuple() (https://github.com/tobymao/sqlglot/issues/6989)
+    # and Snowflake SEMANTIC_VIEW dimensions with aliases (https://github.com/tobymao/sqlglot/issues/6993).
+    # Migrated from [rs] to [c] tokenizer (https://github.com/tobymao/sqlglot/pull/7120).
+    # 30.0.3+ fixes Alias.alias behaviour for Placeholder nodes (Snowflake AS :name syntax)
+    # (https://github.com/tobymao/sqlglot/pull/7310), removing the need for _patch_alias_placeholder.
+    # sqlglot[c] ships mypyc-compiled extensions for performance, but the native
+    # C lib has caused memory leaks in the past. Rather than dropping [c] from
+    # the release when that happens, keep it here and set ORRERY_SQLGLOT_DISABLE_C
+    # to force pure-Python sqlglot at runtime (see
+    # orrery/_force_pure_python_sqlglot.py).
+    # 30.21.0 rewrote pushdown_projections to raise on unexpanded stars; see
+    # orrery/sql_parsing/_legacy_pushdown_projections.py for the fallback.
+    "sqlglot[c]==30.22.0",
+}
+
+dbt_common = {
+    *sqlglot_lib,
+    "more-itertools<11.0.0",
+}
+
+cachetools_lib = {
+    "cachetools<6.0.0",
+}
+
+# Skip pyarrow 0.14.0-14.0.0 due to CVE-2023-47248: https://avd.aquasec.com/nvd/cve-2023-47248
+# Note: feast<=0.47.0 (constrained by numpy<2) requires pyarrow<18.1.0, resolved automatically
+pyarrow_common = {
+    "pyarrow>14.0.0,<24.0.0",
+}
+
+sqlalchemy_lib = {
+    # Required for all SQL sources.
+    "sqlalchemy>=2.0.0,<2.1",
+    # greenlet is imported directly by
+    # orrery.ingestion.source.sqlalchemy_profiler.query_combiner, which is used
+    # by the SQLAlchemy profiler (and surfaced in sql_report.py).
+    "greenlet<4.0.0",
+}
+sql_common = (
+    {
+        *sqlalchemy_lib,
+        *cachetools_lib,
+    }
+    | usage_common
+    | sqlglot_lib
+)
+
+aws_common = {
+    # AWS Python SDK
+    # Minimum 1.35.0 required for S3 ListBuckets Prefix parameter support (added October 2024)
+    "boto3>=1.35.0,<2.0.0",
+    # Deal with a version incompatibility between botocore (used by boto3) and urllib3.
+    # See https://github.com/boto/botocore/pull/2563.
+    "botocore!=1.23.0",
+    "botocore!=1.23.0,<2.0.0",
+}
+
+path_spec_common = {
+    "parse>=1.19.0,<2.0.0",
+    "wcmatch>=10.1,<11.0.0",
+}
+
+looker_common = {
+    # Looker Python SDK
+    "looker-sdk>=23.0.0,<26.0.0",
+    # This version of lkml contains a fix for parsing lists in
+    # LookML files with spaces between an item and the following comma.
+    # See https://github.com/joshtemple/lkml/issues/73.
+    "lkml>=1.3.4,<2.0.0",
+    *sqlglot_lib,
+    "GitPython>=3.1.58,<4.0.0",
+    "python-liquid>=2.0.0,<3.0.0",
+    "deepmerge>=1.1.1,<3.0.0",
+}
+
+bigquery_common = {
+    # Google cloud logging library
+    "google-cloud-logging<4.0.0",
+    # >=3.14.0 for QueryJobConfig.job_timeout_ms (partition-fetch probe timeout).
+    "google-cloud-bigquery>=3.14.0,<4.0.0",
+    "google-cloud-datacatalog>=1.5.0,<4.0.0",
+    "google-cloud-resource-manager<2.0.0",
+    "more-itertools>=8.12.0,<11.0.0",
+    "sqlalchemy-bigquery>=1.5.0,<2.0.0",
+    *path_spec_common,
+}
+
+clickhouse_common = {
+    # Clickhouse 0.2.0 adds support for SQLAlchemy 1.4.x
+    # Disallow 0.2.5 because of https://github.com/xzkostyan/clickhouse-sqlalchemy/issues/272.
+    # Note that there's also a known issue around nested map types: https://github.com/xzkostyan/clickhouse-sqlalchemy/issues/269.
+    # zstd needs to be pinned because the latest version causes issues on arm
+    "zstd<1.5.6.8",
+    "clickhouse-sqlalchemy>=0.3.0,<0.4.0",
+}
+
+datacatalog_lineage_common = {
+    # 0.3.0+ uses google.cloud.datacatalog_lineage import path.
+    "google-cloud-datacatalog-lineage>=0.5.0,<1.0.0",
+    # Enforce non-vulnerable protobuf baseline (CVE-2026-0994).
+    "protobuf>=5.0.0,<7.0.0",
+}
+
+bigquery_sharing_common = {
+    # Only reached when `extract_subscriptions_from_analytics_hub` is enabled. It is
+    # not part of bigquery_common because bigquery-slim, bigquery-queries and fivetran
+    # all pull that set and none of them use this code path.
+    # The floor is set by the newest symbol the handler touches, not the oldest:
+    # list_subscriptions/Subscription.listing/state land in 0.4.3, SharedResourceType
+    # in 0.4.18, and Subscription.destination_dataset in 0.4.19. Below that last one
+    # subscription matching silently finds nothing.
+    "google-cloud-bigquery-analyticshub>=0.4.19,<1.0.0",
+}
+
+dataplex_common = {
+    "google-cloud-dataplex<3.0.0",
+    "google-cloud-resource-manager<2.0.0",
+    # Reads metadata EXPORT job output (extraction_method: export) from GCS.
+    "google-cloud-storage>=2.10.0,<4.0.0",
+    *datacatalog_lineage_common,
+    "tenacity>=8.0.1,<9.0.0",
+}
+
+redshift_common = {
+    # Clickhouse 0.8.3 adds support for SQLAlchemy 1.4.x
+    "sqlalchemy-redshift>=1.0.0,<2.0.0",
+    "GeoAlchemy2<0.19.0",
+    "redshift-connector>=2.1.14,<3.0.0",
+    *path_spec_common,
+}
+
+snowflake_common = {
+    # Lower bound >=1.4.6: Versions 1.4.3-1.4.5 require snowflake-connector-python<3.0.0,
+    # but we need snowflake-connector-python>=3.4.0. Version 1.4.6+ supports connector 3.x.
+    # Original lower bound 1.4.3 was due to https://github.com/snowflakedb/snowflake-sqlalchemy/issues/350
+    #
+    # Upper bound <1.7.4: Version 1.7.4 of snowflake-sqlalchemy introduced a bug that breaks
+    # table column name reflection for non-uppercase table names. The original reason for
+    # this cap was the (now removed) Great Expectations profiler, which relied on that
+    # reflection. Re-validate against the SQLAlchemy profiler before lifting the cap.
+    #
+    # See: https://github.com/snowflakedb/snowflake-sqlalchemy/compare/v1.7.3...v1.7.4
+    #
+    # The exact cause of the breakage in v1.7.4 is unclear, but it may be related to
+    # changes in the _get_table_columns function. I initially suspected PR #541
+    # (https://github.com/snowflakedb/snowflake-sqlalchemy/pull/541), but that has been
+    # present since v1.7.0 and does not appear to cause issues.
+    #
+    # Reflection failures for case-sensitive object names are a known issue:
+    # https://github.com/snowflakedb/snowflake-sqlalchemy/issues/388
+    # As of May 2025, snowflake-sqlalchemy is in maintenance mode. I have commented on the
+    # above issue and we are pinning to a safe version.
+    #
+    # Upper bound <1.7.4 was (accidentally?) removed
+    # in https://github.com/Dxlxz/orrery/pull/16188 for fixing CVE
+    #
+    # 1.8.x allows snowflake-connector-python 4.x (required for cryptography>=46 / cffi>=2.0).
+    # >=1.11.0 for CVE-2026-15736: SQL injection via MERGE INTO column keys and via
+    # literal-rendered DDL bound params, plus a local file read from connection params
+    # forwarded out of the URL query string. 1.11.x still requires only sqlalchemy>=1.4.19,
+    # so this does not disturb the sqlalchemy<2 pin.
+    "snowflake-sqlalchemy>=1.11.0,<2.0.0",
+    # >=4.0.0 required for cffi>=2.0 (needed by cryptography>=46). 3.x pins cffi<2.0 and is
+    # incompatible with cryptography 46+. 3.8.0 was yanked.
+    # >= 4.4.0 for pyOpenSSL>=26.0.0 which solves CVE-2024-27459 & CVE-2026-28448
+    # >= 4.7.1 for CVE-2026-15925: the connector accepted a certificate signed by any
+    # trusted CA for any domain without matching the requested host. 4.7.0 was yanked.
+    # Floor is 4.7.3: 4.7.1/4.7.2 reject valid certificates for account locators with underscores.
+    "snowflake-connector-python>=4.7.3,<5.0.0",
+    "pandas<3.0.0",
+    # >=50.0.0 for CVE-2026-69247; >=49.0.0 covered CVE-2026-69249 (path-building DoS).
+    # <51 aligns with pyOpenSSL/msal. Prior floor >=48.0.1 covered GHSA-537c-gmf6-5ccf.
+    "cryptography>=50.0.0,<51.0.0",
+    "msal<2.0.0",
+    "tenacity>=8.0.1,<9.0.0",
+    *cachetools_lib,
+    *path_spec_common,
+}
+
+trino = {
+    "trino[sqlalchemy]>=0.308,<=0.336.0",
+}
+
+# Kerberos (GSSAPI) over Thrift SASL, for HiveServer2 and the Hive Metastore.
+thrift_sasl_common = {
+    "pure-sasl>=0.6.2,<1.0.0",
+    "thrift-sasl>=0.4.3,<1.0.0",
+}
+
+# HiveServer2 / Spark Thrift Server driver for Orrery's Hive SQLAlchemy dialects.
+hive_common = thrift_sasl_common | {
+    "impyla>=0.24.0,<1.0.0",
+}
+
+presto_common = {
+    "presto-python-client>=0.8.4,<1.0.0",
+}
+
+microsoft_common = {
+    "msal>=1.31.1,<2.0.0",
+}
+
+iceberg_common = {
+    # PyIceberg dependency restrictions history:
+    # - From v0.4.0, pydantic v2 is required.
+    # - From v0.8.0, there have been changes to the catalog connection configuration details -
+    # especially for AWS-based catalogs and warehouses, the properties `profile_name`, `region_name`,
+    # `aws_access_key_id`, `aws_secret_access_key`, and `aws_session_token` were deprecated and removed in version
+    # 0.8.0.
+    # - Versions 0.7.0 - 0.8.1 use variable DEPRECATED_BOTOCORE_SESSION instead of BOTOCORE_SESSION, the latter is
+    #   expected by the connector
+    # - v0.11.0 dropped the `zstandard` extra (now a core dependency).
+    "pyiceberg[glue,hive,dynamodb,snappy,s3fs,adlfs,pyarrow]>=0.11.0,<0.12.0",
+    # iceberg_common.py imports SortedList directly. This was pulled in transitively
+    # by pyiceberg <=0.10, but v0.11.0 dropped it, so declare it explicitly.
+    "sortedcontainers>=2.4.0,<3.0.0",
+    *cachetools_lib,
+}
+
+mssql_common = {
+    # Note: sqlalchemy-pytds>=1.0 requires SQLAlchemy>=2, so constrained to 0.x automatically
+    "sqlalchemy-pytds>=1.0.0,<2.0.0",
+    # >=26.4.0: pyOpenSSL 26.0-26.3 crash on import against cryptography>=49
+    # (AttributeError: module 'lib' has no attribute 'GEN_EMAIL'), which the
+    # cryptography>=49.0.0,<51.0.0 range above can resolve to.
+    "pyOpenSSL>=26.4.0,<27.0.0",
+}
+
+postgres_common = {
+    "psycopg2-binary<3.0.0",
+    "GeoAlchemy2<0.19.0",
+}
+
+s3_base = {
+    *aws_common,
+    "more-itertools>=8.12.0,<11.0.0",
+    "parse>=1.19.0,<2.0.0",
+    *pyarrow_common,
+    "tableschema>=1.20.2,<2.0.0",
+    # ujson 5.2.0 has the JSONDecodeError exception type, which we need for error handling.
+    # >=5.12.0: fixes DoS (memory growth on parsing huge integers in 5.4–5.11; dumps() indent
+    # overflow/infinite loop GHSA-c8rr-9gxc-jprv).
+    # >=5.12.1: CVE-2026-44660 — memory leak in ujson.dump() on write failure.
+    # Keep <6 until major API review.
+    "ujson>=5.12.1,<6.0.0",
+    "smart-open[s3]>=5.2.1,<8.0.0",
+    *path_spec_common,
+    # cachetools is used by operation_config which is imported by profiling config
+    *cachetools_lib,
+}
+
+
+abs_base = {
+    # CVE-2025-36068: azure-core <1.34.0 has Server-Side Request Forgery via
+    # redirect handling in the pipeline transport layer, fixed in 1.38.0.
+    "azure-core>=1.38.0,<2.0.0",
+    "azure-identity>=1.21.0,<2.0.0",
+    "azure-storage-blob>=12.19.0,<13.0.0",
+    "azure-storage-file-datalake>=12.14.0,<13.0.0",
+    "more-itertools>=8.12.0,<11.0.0",
+    *pyarrow_common,
+    "smart-open[azure]>=5.2.1,<8.0.0",
+    "tableschema>=1.20.2,<2.0.0",
+    "ujson>=5.12.1,<6.0.0",
+    *path_spec_common,
+}
+
+azure_data_factory = {
+    "azure-identity>=1.21.0,<2.0.0",
+    "azure-mgmt-datafactory>=9.0.0,<10.0.0",
+    *sqlglot_lib,
+}
+
+file_profiling = {
+    # cpc_sketch (distinct count) and kll_floats_sketch (approx median) give us
+    # Deequ-equivalent approximate metrics without a JVM or pyspark/pydeequ.
+    "datasketches>=5.0.0,<6.0.0",
+    # The profiler reads Avro files with fastavro.
+    "fastavro>=1.2.0,<2.0.0",
+    # pyarrow resolves tz-aware timestamps (e.g. CSV values ending in "Z" infer as
+    # tz=UTC) through zoneinfo, which needs a tz database. Slim images have no system
+    # zoneinfo, so ship IANA data via tzdata. Same pin as databricks_common.
+    "tzdata>=2022.7,<2030",
+    # cachetools is used by the profiling config
+    *cachetools_lib,
+}
+
+delta_lake = {
+    *s3_base,
+    *abs_base,
+    # Version 0.18.0 broken on ARM Macs: https://github.com/delta-io/delta-rs/issues/2577
+    # Version 1.0.2 breaks due to Unsupported reader features required: [DeletionVectors]: https://github.com/delta-io/delta-rs/issues/1094
+    "deltalake>=0.6.3, != 0.6.4, != 0.18.0, <1.0.0; platform_system == 'Darwin' and platform_machine == 'arm64'",
+    "deltalake>=0.6.3, != 0.6.4, <1.0.0; platform_system != 'Darwin' or platform_machine != 'arm64'",
+}
+
+powerbi_report_server = {"requests<3.0.0", "requests_ntlm<2.0.0"}
+
+slack = {
+    "slack-sdk==3.18.1",
+    "tenacity>=8.0.1,<9.0.0",
+}
+
+snowplow = {
+    *cachetools_lib,
+}
+
+databricks_common = {
+    # 0.1.11 appears to have authentication issues with azure databricks
+    # 0.22.0 has support for `include_browse` in metadata list apis
+    "databricks-sdk>=0.30.0,<1.0.0",
+    # Version 2.4.0 includes sqlalchemy dialect, 2.8.0 includes some bug fixes
+    # Version 3.0.0 required SQLAlchemy > 2.0.21
+    # TODO: When upgrading to >=3.0.0, remove proxy authentication monkey patching
+    # in src/orrery/ingestion/source/unity/proxy.py (_patch_databricks_sql_proxy_auth)
+    # as the fix was included natively in 3.0.0 via https://github.com/databricks/databricks-sql-python/pull/354
+    # 4.7.0 relaxes the oauthlib cap to <5.0.0, allowing oauthlib>=4.0.0
+    # (fixes CVE-2026-49264 / CVE-2026-49265)
+    "databricks-sql-connector>=4.7.0,<5.0.0",
+    # connector 4.x split the SQLAlchemy dialect into a separate package; required so
+    # create_engine("databricks://...") can load the dialect for SQLAlchemy profiling.
+    "databricks-sqlalchemy>=2.0.0,<3.0.0",
+    # The SQL connector returns tz-aware Arrow timestamps. pyarrow needs a tz database
+    # to convert them, and slim images have no system zoneinfo, so ship IANA data via
+    # tzdata (zoneinfo's fallback). 2022.7 matches the floor pandas uses. Versions are
+    # year-based and carry only data, so the cap is loose to avoid yearly bumps.
+    "tzdata>=2022.7,<2030",
+}
+
+databricks = {
+    "requests<3.0.0",
+}
+
+# [rsa] pulls cryptography, needed for MySQL 8 caching_sha2_password full auth.
+mysql = {"pymysql[rsa]>=1.0.2,<2.0.0"}
+mysql_common = sql_common | mysql | aws_common
+
+sac = {
+    "requests<3.0.0",
+    # GHSA-jj8c-mmj3-mmgv: OAuth cache CSRF; fixed in >=1.6.11
+    # CVE-2026-96760: fixed in 1.9.0
+    "Authlib>=1.9.0,<2.0.0",
+    # Safe XML parsing for Data Export Service $metadata (shared sap_common.edmx).
+    "defusedxml>=0.7.1,<0.8.0",
+}
+
+superset_common = {
+    "requests<3.0.0",
+    *sqlglot_lib,
+}
+
+embedding_common = {
+    # AWS SDK for Bedrock embedding support (SigV4 + AWS credential chain).
+    # OpenAI, Cohere, and the local provider all hit raw HTTP endpoints via
+    # `requests` (already required by orrery) — no SDKs needed.
+    *aws_common,
+    # google-auth handles ADC / OAuth refresh for Vertex AI; the Vertex
+    # :predict call itself goes over plain HTTP.
+    "google-auth>=2.0.0,<3.0.0",
+}
+
+# In-process ONNX document embedding (mirrors the GMS built-in query-side
+# provider). Kept as a separate extra so the common embedding path doesn't pull
+# onnxruntime for users who embed via a cloud provider. `tokenizers` gives the
+# same HuggingFace tokenizer the Java side uses via DJL, for token-level parity.
+# onnxruntime capped below 1.24: 1.24+ dropped cp310 wheels, and ingestion
+# still supports Python 3.10. The library version is independent of the Java
+# query-side onnxruntime; vector parity comes from the shared model + tokenizer,
+# not the runtime version (inference is deterministic across versions).
+onnx_embeddings = {
+    "onnxruntime>=1.19.0,<1.24",
+    "tokenizers>=0.20.0,<1.0.0",
+}
+
+unstructured_lib = {
+    # Unstructured.io core library for document partitioning with markdown support
+    # CVE-2026-71428: SSRF in partition(url=...) fixed in 0.24.0+ (requires Python 3.11+).
+    # 0.24.x capped filelock<4, holding resolved envs on the 3.x line affected by
+    # CVE-2026-112940; 0.27.x requires filelock>=4.2.1, which carries the fix.
+    "unstructured[md]==0.27.37",
+    # unstructured 0.27.x accepts ingest >=1.4.0,<2
+    "unstructured-ingest==1.4.28",
+    # JSONPath for custom property extraction
+    "jsonpath-ng==1.7.0",
+    # Transitive via unstructured, which requires plain `nltk`. 3.10.1 added an
+    # import hook (nltk/inisec.py, NLTKSafeImportFinder) that blocks any
+    # nltk-initiated import resolving under the CWD, which includes site-packages
+    # whenever the venv lives in the project dir -- the standard
+    # `python -m venv .venv` / uv / Poetry in-project layout. That breaks text
+    # partitioning, so document chunking silently produces nothing (zero documents
+    # indexed, exit 0). See https://github.com/nltk/nltk/issues/3730.
+    # Upstream reverted the hook: inisec.py ships in 3.10.1 only and is absent from
+    # 3.10.2 onwards, so this excludes just that release rather than capping.
+    "nltk!=3.10.1",
+    # Embedding support for semantic search
+    *embedding_common,
+}
+
+notion_common = {
+    # Notion-specific connector adds notion-client and related dependencies
+    "unstructured-ingest[notion]==1.4.28",
+} | unstructured_lib
+
+confluence_common = {
+    # Confluence-specific connector adds atlassian-python-api and related dependencies
+    "unstructured-ingest[confluence]==1.4.28",
+    "atlassian-python-api>=3.41.0,<5.0.0",  # Supports 3.x and 4.x API versions
+    # Preserve Confluence storage HTML structure as Markdown for chunking/retrieval
+    "markdownify>=0.14.1,<2.0.0",
+    # Required for GraphQL query adaptation (strip_unsupported_fields) when fetching
+    # semantic search config from older Orrery servers that lack vertexProviderConfig.
+    "graphql-core>=3.0.0,<4.0.0",
+} | unstructured_lib
+
+google_drive_common = {
+    "google-api-python-client>=2.0.0,<3.0.0",
+    "google-auth>=2.0.0,<3.0.0",
+    # HTML-to-markdown fallback when a Google Doc's markdown export fails
+    "markdownify>=0.14.1,<2.0.0",
+    # Required for GraphQL query adaptation when fetching semantic search config
+    # from older Orrery servers (same reason as confluence).
+    "graphql-core>=3.0.0,<4.0.0",
+} | unstructured_lib
+
+# Note: for all of these, framework_common will be added.
+plugins: Dict[str, Set[str]] = {
+    # Sink plugins.
+    "orrery-kafka": {
+        # At some moment, we decoupled from using here kafka_common
+        # That's becuase kafka_common has more strict lower bound versions that conflict with airflow depedency constraints
+        "confluent_kafka[schemaregistry,avro]>=1.9.0,!= 2.8.1,<3.0.0",
+        "fastavro>=1.2.0,<2.0.0",
+    },
+    "orrery-pg-queue": {
+        "confluent_kafka[schemaregistry,avro]>=1.9.0,!= 2.8.1,<3.0.0",
+        "fastavro>=1.2.0,<2.0.0",
+        "psycopg2-binary<3.0.0",
+    }
+    | aws_common,
+    "orrery-rest": rest_common,
+    # 3.13.1 minimum for Airflow 2.7.3+ constraint compatibility (and filelock 4.2.1+ needs Python 3.11+);
+    # Docker/constraints enforce >=4.2.1 where needed.
+    "sync-file-emitter": {"filelock>=3.13.1,<5.0.0"},
+    # Orrery Lite defaults to the stdlib sqlite3 engine, so this extra only
+    # pulls in the `orrery lite serve` stack. The optional duckdb engine lives
+    # in its own extra below.
+    "orrery-lite": {
+        # >=0.133.0: older fastapi caps starlette<1.0, blocking its CVE fixes.
+        "fastapi>=0.133.0,<0.142.0",
+        # CVE-2026-48710, CVE-2026-48817, CVE-2026-48818, CVE-2026-54282,
+        # CVE-2026-54283; fixed in 1.3.1.
+        "starlette>=1.3.1,<2.0.0",
+        "uvicorn<0.41.0",
+    },
+    # Alternative Orrery Lite storage engine, selected with `lite.type: duckdb`.
+    # The extra is named after the lite implementation key so that the plugin
+    # registry's "pip install orrery[duckdb]" hint is accurate.
+    "duckdb": {"duckdb>=1.0.0,<2.0.0"},
+    # Integrations.
+    "airbyte": {"requests"},
+    "airflow": {
+        f"orrery-airflow-plugin{_self_pin}",
+    },
+    # The circuit breakers query GMS through OrreryGraph, so this needs no
+    # extra dependencies. Kept as an empty extra so existing installs that
+    # pin orrery[circuit-breaker] keep resolving.
+    "circuit-breaker": set(),
+    # TODO: Eventually we should reorganize our imports so that this depends on sqlalchemy_lib
+    # but not the full sql_common.
+    "orrery": sql_common | mysql | kafka_common,
+    "great-expectations": {
+        f"orrery-gx-plugin{_self_pin}",
+    },
+    # Misc plugins.
+    "sql-parser": sqlglot_lib,
+    # Source plugins
+    "aerospike": {"aerospike>=15.0.0,<20.0.0"},
+    # sqlalchemy-bigquery is included here since it provides an implementation of
+    # a SQLalchemy-conform STRUCT type definition
+    "athena": sql_common
+    # We need to set tenacity lower than 8.4.0 as
+    # this version has missing dependency asyncio
+    # https://github.com/jd/tenacity/issues/471
+    | {
+        "PyAthena[SQLAlchemy]>=3.0.0,<4.0.0",
+        "sqlalchemy-bigquery>=1.5.0,<2.0.0",
+        "tenacity!=8.4.0,<9.0.0",
+    },
+    "azure-ad": set(),
+    "azure-auth": {"azure-identity>=1.21.0,<2.0.0"},
+    "azure-data-factory": azure_data_factory,
+    "fabric-data-factory": {
+        "azure-core>=1.38.0,<2.0.0",
+        "azure-identity>=1.21.0,<2.0.0",
+        "requests>=2.28.0,<3.0",
+    },
+    "fabric-onelake": {
+        "sqlalchemy>=1.4,<3.0",
+        "pyodbc>=4.0,<6.0.0",
+        # upper bound added to pass check-python-deps.yml github workflow
+        "azure-identity>=1.21.0,<2.0",
+        # upper bound added to pass check-python-deps.yml github workflow
+        "requests>=2.28.0,<3.0",
+    }
+    | sqlglot_lib
+    | usage_common,
+    "bigid": {"requests>=2.28.0,<3.0"},
+    "bigquery": sql_common
+    | bigquery_common
+    | sqlglot_lib
+    | datacatalog_lineage_common
+    | bigquery_sharing_common,
+    "bigquery-slim": bigquery_common,
+    "bigquery-queries": sql_common | bigquery_common | sqlglot_lib,
+    "clickhouse": sql_common | clickhouse_common,
+    "clickhouse-usage": sql_common | usage_common | clickhouse_common,
+    "cockroachdb": sql_common
+    | postgres_common
+    | aws_common
+    | {"sqlalchemy-cockroachdb>=2.0.0,<3.0.0"},
+    "csv-enricher": set(),
+    "orrery-lineage-file": set(),
+    "orrery-business-glossary": set(),
+    "dataplex": dataplex_common | cachetools_lib,
+    "delta-lake": {*delta_lake},
+    "db2": {
+        # The underlying ibm_db library and Db2 clidriver don't work on Linux ARM
+        "ibm_db_sa>=0.4.4,<0.5.0; platform_machine == 'x86_64' or platform_system == 'Darwin'",
+        "pyodbc<6.0.0",
+        *sql_common,
+    },
+    "dbt": {"requests<3.0.0"} | dbt_common | aws_common,
+    "dbt-cloud": {"requests<3.0.0"} | dbt_common,
+    "dremio": {"requests<3.0.0"} | sql_common,
+    "druid": sql_common | {"pydruid>=0.6.2,<=0.6.9"},
+    "dynamodb": aws_common,
+    # opensearch-py, not elasticsearch-py: the latter only supports Elasticsearch and rejects OpenSearch.
+    # 3.x generated APIs are keyword-only; require >=3 so 2.x is not installed.
+    "elasticsearch": {"opensearch-py>=3.0.0,<4.0.0", *cachetools_lib},
+    "excel": {
+        "openpyxl>=3.1.5,<4.0.0",
+        "pandas<3.0.0",
+        *aws_common,
+        *abs_base,
+        *cachetools_lib,
+    },
+    "cassandra": {
+        # 3.30.1 fixes "Prevent crash at exit" (PR 1287): before it, the libev reactor
+        # registered atexit.register(partial(_cleanup, _global_loop)) at import time,
+        # which binds None permanently and leaves the reactor thread running into
+        # interpreter shutdown -- intermittently segfaulting the process (exit 139)
+        # after ingestion had already succeeded.
+        "cassandra-driver>=3.30.1,<4.0.0",
+        # We were seeing an error like this `numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject`
+        # with numpy 2.0. This likely indicates a mismatch between scikit-learn and numpy versions.
+        # https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility
+        # Scoped below 3.13: numpy 1.x has no 3.13 wheels and does not build there.
+        # On 3.13, cap at the next major for the same binary-compatibility reason.
+        'numpy<2; python_version < "3.13"',
+        'numpy<3; python_version >= "3.13"',
+        *cachetools_lib,
+    },
+    "feast": {
+        # 0.47 declares fastapi>=0.68 with no upper bound, so starlette>=1.3.1
+        # can resolve. 0.34–0.46 pin a FastAPI that cannot take Starlette 1.3.
+        # feast>=0.48 requires numpy>=2, so numpy<2 below still caps feast at 0.47 on Python < 3.13.
+        "feast>=0.47.0,<1",
+        # feast pulls starlette via fastapi; same CVE floor as orrery-lite.
+        "starlette>=1.3.1,<2.0.0",
+        "flask-openid>=1.3.0,<2.0.0",
+        "dask[dataframe]<2024.7.0",
+        # We were seeing an error like this `numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject`
+        # with numpy 2.0. This likely indicates a mismatch between scikit-learn and numpy versions.
+        # https://stackoverflow.com/questions/40845304/runtimewarning-numpy-dtype-size-changed-may-indicate-binary-incompatibility
+        # Scoped below 3.13: numpy 1.x has no 3.13 wheels and does not build there.
+        # On 3.13, cap at the next major for the same binary-compatibility reason.
+        'numpy<2; python_version < "3.13"',
+        'numpy<3; python_version >= "3.13"',
+    },
+    "flink": {"requests<3.0.0", "tenacity>=8.0.1,<9.0.0"},
+    "grafana": {"requests<3.0.0", *sqlglot_lib},
+    "omni": {"requests<3.0.0", "tenacity>=8.0.1,<9.0.0"},
+    # usage_common (sqlparse) is required by SqlParsingAggregator, used for view lineage.
+    "glue": aws_common | cachetools_lib | sqlglot_lib | usage_common,
+    # hdbcli is supported officially by SAP, sqlalchemy-hana is built on top but not officially supported
+    "hana": sql_common
+    | {
+        # Note: sqlalchemy-hana>=4.0 requires SQLAlchemy>=2, so constrained to 3.x automatically
+        "sqlalchemy-hana>=4.0.0,<5.0.0; platform_machine != 'aarch64' and platform_machine != 'arm64'",
+        "hdbcli>=2.11.20,<3.0.0; platform_machine != 'aarch64' and platform_machine != 'arm64'",
+        "defusedxml>=0.7.1,<0.8.0",
+    },
+    "hive": sql_common | hive_common,
+    # keep in sync with presto-on-hive until presto-on-hive will be removed
+    # Supports both SQL (psycopg2/pymysql) and Thrift (pymetastore) connection types
+    # kerberos is required for GSSAPI auth (pure-sasl delegates to it)
+    "hive-metastore": sql_common
+    | thrift_sasl_common
+    | {
+        "psycopg2-binary<3.0.0",
+        "pymysql[rsa]>=1.0.2,<2.0.0",
+        "pymetastore>=0.4.2,<1.0.0",
+        "tenacity>=8.0.1,<9.0.0",
+        "kerberos>=1.3.0,<2.0.0",
+    },
+    "hex": {"requests<3.0.0"} | sqlglot_lib,
+    "iceberg": iceberg_common,
+    "iceberg-catalog": aws_common,
+    "informatica": {
+        "requests<3.0.0",
+        # Safe XML parsing for IDMC v3 Export .TASKFLOW.xml payloads
+        # (blocks billion-laughs / external-entity attacks).
+        "defusedxml>=0.7.1,<0.8.0",
+    },
+    # sqlglot_lib: view lineage reuses orrery.sql_parsing (sqlglot), which is not
+    # in the base install; JPype1/jdk4py bridge to the JDBC driver (no SQLAlchemy).
+    "informix": sqlglot_lib | {"JPype1<2.0.0", "jdk4py>=21.0,<22.0"},
+    "json-schema": {"requests<3.0.0"},
+    # sqlglot_lib: Flink stream-processing lineage parses transform SQL for
+    # best-effort column-level lineage via orrery.sql_parsing.
+    "kafka": kafka_common | kafka_protobuf | sqlglot_lib,
+    "kafka-connect": sql_common
+    | {"requests<3.0.0", "JPype1<2.0.0", "jdk4py>=21.0,<22.0"},
+    # kafka_protobuf reused for Glue Schema Registry PROTOBUF support
+    # (kinesis_schema_registry imports protobuf_util at module load).
+    "kinesis": aws_common | kafka_protobuf,
+    "langfuse": {"requests<3.0.0"},
+    # Glue Schema Registry PROTOBUF schemas also need the kafka extra (grpc).
+    "sqs": aws_common,
+    "sns": aws_common,
+    "ldap": {"python-ldap>=2.4,<4.0.0"},
+    "looker": looker_common,
+    "lookml": looker_common,
+    "metabase": {"requests<3.0.0"} | sqlglot_lib,
+    # usage_common: microstrategy emits no usage through it, but SQL-view lineage
+    # goes through create_lineage_from_sql_statements in sqlglot_lineage, which
+    # imports usage_common and so pulls sqlparse in via sql_formatter.
+    "microstrategy": {"requests<3.0.0"} | sqlglot_lib | usage_common,
+    "mlflow": {
+        "mlflow-skinny>=2.3.0,<2.21.0",
+        # Pinned to avoid the breaking change introduced in MLflow 2.21.0 where search_registered_models injects an implicit filter
+        # https://github.com/mlflow/mlflow/pull/14795
+        # Upper bound can be removed once the upstream issue is resolved,
+        # or we have a reliable and backward-compatible way to handle prompt filtering.
+    },
+    "orrery-debug": {"dnspython==2.7.0", "requests<3.0.0"},
+    "orrery-gc": set(),
+    "orrery-documents": unstructured_lib,
+    # Optional add-on: embed documents in-process with ONNX instead of a cloud
+    # provider, matching the GMS built-in query-side provider. Install alongside
+    # orrery-documents (e.g. orrery[orrery-documents,onnx-embeddings]).
+    "onnx-embeddings": onnx_embeddings,
+    "mode": {"requests<3.0.0", "python-liquid>=2.0.0,<3.0.0", "tenacity>=8.0.1,<9.0.0"}
+    | sqlglot_lib
+    | cachetools_lib,
+    "mongodb": {"pymongo[aws]>=4.8.0,<5.0.0", "packaging<26.0.0"},
+    "mssql": sql_common | mssql_common,
+    "mssql-odbc": sql_common | mssql_common | {"pyodbc<6.0.0"},
+    "mysql": mysql_common,
+    "mariadb": mysql_common,
+    "tidb": mysql_common,
+    "doris": mysql_common,
+    "odcs": aws_common | {"GitPython>=3.1.58,<4.0.0"},
+    "okta": {"okta~=1.7.0,<2.0.0", "nest-asyncio<2.0.0", "flatdict!=4.0.1"},
+    "openapi": {"requests<3.0.0"},
+    "oracle": sql_common | {"oracledb<4.0.0"},
+    "postgres": sql_common | postgres_common | aws_common,
+    "presto": sql_common | presto_common | trino,
+    # presto-on-hive is an alias for hive-metastore and needs to be kept in sync
+    "presto-on-hive": sql_common
+    | thrift_sasl_common
+    | {
+        "psycopg2-binary<3.0.0",
+        "pymysql[rsa]>=1.0.2,<2.0.0",
+        "pymetastore>=0.4.2,<1.0.0",
+        "tenacity>=8.0.1,<9.0.0",
+        "kerberos>=1.3.0,<2.0.0",
+    },
+    "pulsar": {"requests<3.0.0"},
+    "redash": {"redash-toolbelt<0.2.0"} | sqlglot_lib,
+    "rdf": {"rdflib==6.3.2", "requests==2.32.5", "requests_file==3.0.1"},
+    "redshift": sql_common
+    | redshift_common
+    | usage_common
+    | sqlglot_lib
+    | {"db-dtypes"}  # Pandas extension data types
+    | cachetools_lib,
+    # Like snowflake-slim / bigquery-slim: Redshift metadata without sql_common (urllib3 1.x lock-in).
+    "redshift-slim": redshift_common
+    | usage_common
+    | sqlglot_lib
+    | {"db-dtypes"}
+    | cachetools_lib,
+    # Profiling is now a lightweight pure-Python profiler (pyarrow + datasketches,
+    # no JVM), so the `-slim` variants no longer differ from the full extras. They
+    # are kept as deprecated aliases and will be removed in a follow-up (along with
+    # their CI/CD and image-building references).
+    "s3": {*s3_base, *file_profiling},
+    "s3-slim": {*s3_base, *file_profiling},
+    "gcs": {*s3_base, *file_profiling, "smart-open[gcs]>=5.2.1,<8.0.0"},
+    "gcs-slim": {*s3_base, *file_profiling, "smart-open[gcs]>=5.2.1,<8.0.0"},
+    "abs": {*abs_base, *file_profiling},
+    "abs-slim": {*abs_base},
+    "sagemaker": aws_common,
+    "salesforce": {"simple-salesforce<2.0.0", *cachetools_lib},
+    "sap-datasphere": rest_common | {"defusedxml>=0.7.1,<0.8.0"},
+    "snowflake": snowflake_common | sql_common | usage_common | sqlglot_lib,
+    "snowflake-slim": snowflake_common,
+    "snowflake-summary": snowflake_common | sql_common | usage_common | sqlglot_lib,
+    "snowflake-queries": snowflake_common | sql_common | usage_common | sqlglot_lib,
+    "snowplow": snowplow,
+    # Floor at 0.235.2: first release pinning sqlglot~=30.8.0. Cap at <0.237 after
+    # vetting 0.236. Excluded from the pyproject/uv lock and from the "all" extra
+    # because Orrery pins sqlglot[c]==30.22.0 and no released sqlmesh accepts that
+    # yet — install with ``pip install 'orrery[sqlmesh]'`` (setuptools path)
+    # in a dedicated environment. Re-vet and restore to the lock when sqlmesh bumps.
+    "sqlmesh": {"sqlmesh>=0.235.2,<0.237", *cachetools_lib}
+    | aws_common
+    | {"GitPython>=3.1.58,<4.0.0"},
+    "sqlalchemy": sql_common,
+    "sql-queries": usage_common
+    | sqlglot_lib
+    | aws_common
+    | {"smart-open[s3]>=5.2.1,<8.0.0"},
+    "slack": slack,
+    "superset": superset_common,
+    "preset": superset_common,
+    "tableau": {"tableauserverclient>=0.34,<=0.40"} | sqlglot_lib,
+    "thoughtspot": {"thoughtspot_rest_api>=2.0.0,<3.0.0"} | sqlglot_lib,
+    "teradata": sql_common
+    | usage_common
+    | sqlglot_lib
+    | {
+        # On 2024-10-30, teradatasqlalchemy 20.0.0.2 was released. This version seemed to cause issues
+        # in our CI, so we're pinning the version for now.
+        "teradatasqlalchemy>=20.0.0.9,<21.0.0.0",
+    },
+    # aws_common is needed for the inherited PostgresSource RDS IAM auth.
+    "timescaledb": sql_common | postgres_common | aws_common,
+    "trino": sql_common | trino,
+    "starburst-trino-usage": sql_common | usage_common | trino,
+    "starrocks": sql_common | {"starrocks>=1.3.3,<2.0", "lark>=1.3.1,<2.0"},
+    "nifi": {"requests<3.0.0", "packaging<26.0.0", "requests-gssapi<2.0.0"},
+    "powerbi": (
+        microsoft_common
+        | {"sqlparse>=0.6.0,<1.0.0", "more-itertools<11.0.0", "mini-racer==0.14.1"}
+        | sqlglot_lib
+    ),
+    "powerbi-report-server": powerbi_report_server,
+    "vertica": sql_common | {"sqlalchemy-vertica-python>=0.6.3,<0.7.0"},
+    "unity-catalog": databricks_common | databricks | sql_common,
+    # databricks is alias for unity-catalog and needs to be kept in sync
+    "databricks": databricks_common | databricks | sql_common,
+    "notion": notion_common,
+    "confluence": confluence_common,
+    "google-drive": google_drive_common,
+    "github-documents": set(),
+    "unstructured": unstructured_lib,
+    "fivetran": snowflake_common
+    | bigquery_common
+    | databricks_common
+    | sqlalchemy_lib
+    | sqlglot_lib,
+    "matillion-dpc": {"requests<3.0.0"} | usage_common | sqlglot_lib,
+    "cube": {"requests<3.0.0"} | sqlglot_lib,
+    # dlt is the backing client lib used to read pipeline state. The connector
+    # falls back to direct YAML parsing when dlt is not importable, but in
+    # normal use we expect users opting into the dlt extra to want the SDK
+    # path (richer metadata, run history support).
+    "dlt": {"dlt>=1.0.0,<2.0.0"},
+    "snaplogic": set(),
+    "qlik-sense": sqlglot_lib | {"requests<3.0.0", "websocket-client<2.0.0"},
+    "quicksight": aws_common | sqlglot_lib,
+    # usage_common: sigma emits no usage itself, but SqlParsingAggregator imports
+    # usage_common, which pulls sqlparse in via sql_formatter.
+    # requests>=2.27 for requests.exceptions.JSONDecodeError, which the
+    # source references at import time to classify a malformed response.
+    "sigma": sqlglot_lib | usage_common | {"requests>=2.27,<3.0.0"},
+    # pycarlo is Monte Carlo's official sgqlc-based GraphQL client over the MCD API.
+    "montecarlo": {"pycarlo>=0.15.262,<1.0.0", "tenacity>=8.0.1,!=8.4.0,<9.0.0"},
+    "sac": sac,
+    "neo4j": {"pandas<3.0.0", "neo4j<7.0.0"},
+    "vertexai": {"google-cloud-aiplatform>=1.80.0,<2.0.0"},
+    "hightouch": {"requests<3.0.0"} | usage_common | sqlglot_lib,
+    "pinecone": {"pinecone-client>=3.0.0,<6.0.0"},
+    # Debug/utility plugins
+    "debug-recording": {
+        # VCR.py for HTTP recording - industry standard
+        # vcrpy 8.x required for urllib3 2.x compatibility (fixes replay TypeError);
+        # 8.2.0+ required for aiohttp 3.14, which removed streams.AsyncStreamReaderMixin
+        # that older vcrpy aiohttp stubs subclass.
+        "vcrpy>=8.2.0,<9.0",
+        # responses library for HTTP replay - better compatibility with custom SDK transports
+        # (e.g., Looker SDK) that break with VCR's urllib3 patching
+        "responses>=0.25.0,<1.0",
+        # AES-256 encrypted zip files
+        "pyzipper>=0.3.6,<1.0",
+        # Note: This plugin uses lazy imports to avoid requiring optional dependencies
+        # (e.g., sqlalchemy) when recording is not used. Dependencies like sqlalchemy
+        # are expected to be provided by the source connector itself when needed.
+        # The plugin is designed to be installed alongside source connectors, not standalone.
+    },
+    # Cloud secret store plugins.
+    "aws-secret-manager": aws_common | cachetools_lib,
+    "gcp-secret-manager": gcp_sm_common | cachetools_lib,
+}
+
+# This is mainly used to exclude plugins from the Docker image.
+all_exclude_plugins: Set[str] = {
+    # The Airflow extra is only retained for compatibility, but new users should
+    # be using the orrery-airflow-plugin package instead.
+    "airflow",
+    # The great-expectations extra is only retained for compatibility, but new users should
+    # be using the orrery-gx-plugin package instead.
+    "great-expectations",
+    # SQL Server ODBC requires additional drivers, and so we don't want to keep
+    # it included in the default "all" installation.
+    "mssql-odbc",
+    # Orrery Lite is an opt-in local tool, and its `serve` command pulls in a
+    # whole web stack, so we keep it out of the default "all" installation.
+    "orrery-lite",
+    # duckdb doesn't have a prebuilt wheel for Linux arm7l or aarch64, so we
+    # simply exclude it. Orrery Lite works without it, on sqlite.
+    "duckdb",
+    # Feast tends to have overly restrictive dependencies and hence doesn't
+    # play nice with the "all" installation.
+    "feast",
+    # SQLMesh pins sqlglot~=30.8.0; Orrery pins sqlglot[c]==30.22.0. Until
+    # sqlmesh widens its pin, keep it out of "all" so lock resolution succeeds.
+    "sqlmesh",
+    # Debug recording is an optional debugging tool.
+    "debug-recording",
+    # onnxruntime is a large native binary; in-process ONNX embedding is a niche
+    # opt-in feature, so keep it out of "all" (and the bundled ingestion image).
+    # Install explicitly with orrery[onnx-embeddings].
+    "onnx-embeddings",
+    # unstructured 0.24.x / unstructured-ingest 1.4.x require Python 3.11+. Keep
+    # them out of "all" so uv can lock orrery for requires-python >=3.10.
+    # Install explicitly: orrery[orrery-documents], [notion], [confluence],
+    # [google-drive], or [unstructured]. Managed ingestion still maps source type to
+    # those extras.
+    # The full ingestion image re-adds them:
+    # [all,orrery-documents,notion,confluence,google-drive].
+    "orrery-documents",
+    "unstructured",
+    "notion",
+    "confluence",
+    "google-drive",
+}
+
+mypy_stubs = {
+    "types-dataclasses<0.7.0",
+    "types-six<2.0.0",
+    "types-python-dateutil<3.0.0",
+    # We need to avoid 2.31.0.5 and 2.31.0.4 due to
+    # https://github.com/python/typeshed/issues/10764. Once that
+    # issue is resolved, we can remove the upper bound and change it
+    # to a != constraint.
+    # We have a PR up to fix the underlying issue: https://github.com/python/typeshed/pull/10776.
+    "types-requests>=2.28.11.6,<=2.31.0.3",
+    "types-toml<0.11.0",
+    "types-PyMySQL<2.0.0",
+    "types-PyYAML<7.0.0",
+    "types-cachetools<7.0.0",
+    # versions 0.1.13 and 0.1.14 seem to have issues
+    "types-click==0.1.12",
+    # The boto3-stubs package seems to have regularly breaking minor releases,
+    # we pin to a specific version to avoid this.
+    "boto3-stubs[s3,glue,sagemaker,sts,dynamodb,kinesis,firehose,lakeformation,quicksight]==1.40.0",
+    "types-tabulate<0.11.0",
+    # avrogen package requires this
+    "types-pytz<2026.0.0",
+    "types-pyOpenSSL>=24.1.0.20240722,<27.0.0",
+    "types-click-spinner>=0.1.13.1,<=0.1.13.20250809",
+    "types-ujson>=5.2.0,<6.0.0",
+    "types-Deprecated<2.0.0",
+    "types-protobuf>=4.21.0.1,<7.0.0",
+    # No sqlalchemy stubs: SQLAlchemy 2.0 ships inline (PEP 561) types, and its mypy
+    # plugin refuses to load when sqlalchemy2-stubs/sqlalchemy-stubs are installed.
+}
+
+
+test_api_requirements = {
+    # Do not raise the lower bound to pytest 9.x here: airflow-plugin CI installs
+    # orrery[testing-utils] with Airflow's constraints-*.txt, which pin pytest 7.x.
+    # Current pytest is pinned in constraints.txt / uv.lock for the standalone dev venv.
+    "pytest>=6.2.2,<10.0.0",
+    "pytest-timeout<3.0.0",
+    # CVE-2026-33155: pickle Delta memory-exhaustion DoS; fixed in 8.6.2.
+    # 8.0.0 is also excluded (missing numpy requirement).
+    "deepdiff>=8.6.2,<9.0.0",
+    "orderly-set!=5.4.0,<6.0.0",  # 5.4.0 uses invalid types on older Python versions
+    "PyYAML<7.0.0",
+    "pytest-docker>=1.1.0,<4.0.0",
+}
+
+debug_requirements = {
+    "memray<2.0.0",
+}
+
+lint_requirements = {
+    # This is pinned only to avoid spurious errors in CI.
+    # We should make an effort to keep it up to date.
+    "ruff==0.15.22",
+    "mypy==2.1.0",
+}
+
+base_dev_requirements = {
+    *base_requirements,
+    *framework_common,
+    *mypy_stubs,
+    *s3_base,
+    # moto: AWS mocks for S3 / Dynamo / secrets tests only, not a runtime S3 source dependency
+    "moto[s3]>=5.0.0,<6.0.0",
+    *lint_requirements,
+    *test_api_requirements,
+    "coverage>=5.1,<8.0.0",
+    "faker>=18.4.0,<41.0.0",
+    "pytest-asyncio>=0.16.0,<2.0.0",
+    "pytest-cov>=2.8.1,<8.0.0",
+    "pytest-random-order~=1.1.0,<2.0.0",
+    "hypothesis>=6.0.0,<7.0.0",
+    "pytest-rerunfailures<17.0",
+    "requests-mock<2.0.0",
+    "pytest-httpserver>=1.0.0,<2.0.0",
+    "time-machine<4.0.0",
+    "jsonpickle<5.0.0",
+    "build<2.0.0",
+    "twine<7.0.0",
+    *list(
+        dependency
+        for plugin in [
+            "abs",
+            "aerospike",
+            "airbyte",
+            "athena",
+            "bigquery",
+            "clickhouse",
+            "clickhouse-usage",
+            "cockroachdb",
+            "confluence",
+            "cube",
+            "google-drive",
+            "orrery-documents",
+            "dataplex",
+            "delta-lake",
+            "dlt",
+            "dremio",
+            "druid",
+            "elasticsearch",
+            "feast",
+            "hightouch",
+            "iceberg",
+            "iceberg-catalog",
+            "microstrategy",
+            "mlflow",
+            "mongodb",
+            "json-schema",
+            "ldap",
+            "looker",
+            "lookml",
+            "glue",
+            "mariadb",
+            "tidb",
+            "matillion-dpc",
+            "odcs",
+            "okta",
+            "openapi",
+            "oracle",
+            "postgres",
+            "sagemaker",
+            "kafka",
+            "kinesis",
+            "sqs",
+            "sns",
+            "orrery-rest",
+            "orrery-lite",
+            "duckdb",
+            "presto",
+            "rdf",
+            "redash",
+            "redshift",
+            "s3",
+            "sap-datasphere",
+            "snowflake",
+            "snowplow",
+            "snaplogic",
+            "slack",
+            "tableau",
+            "timescaledb",
+            "teradata",
+            "thoughtspot",
+            "trino",
+            "hive",
+            "hive-metastore",
+            "starburst-trino-usage",
+            "powerbi",
+            "powerbi-report-server",
+            "salesforce",
+            "unity-catalog",
+            "nifi",
+            "notion",
+            "github-documents",
+            "vertica",
+            "mode",
+            "fivetran",
+            "kafka-connect",
+            "qlik-sense",
+            "quicksight",
+            "sigma",
+            "sac",
+            "cassandra",
+            "neo4j",
+            "vertexai",
+            "pinecone",
+            "mssql-odbc",
+            "omni",
+            "aws-secret-manager",
+            "gcp-secret-manager",
+        ]
+        if plugin
+        for dependency in plugins[plugin]
+    ),
+}
+
+dev_requirements = {
+    *base_dev_requirements,
+}
+
+# Documentation generation requirements
+# Includes orrery-documents which requires Python 3.11+ (due to unstructured library)
+docs_requirements = {
+    *base_dev_requirements,
+    *plugins["orrery-documents"],
+}
+
+full_test_dev_requirements = {
+    *list(
+        dependency
+        for plugin in [
+            "athena",
+            "azure-data-factory",
+            "fabric-data-factory",
+            "fabric-onelake",
+            "circuit-breaker",
+            "clickhouse",
+            "db2",
+            "debug-recording",
+            "delta-lake",
+            "doris",
+            "druid",
+            "excel",
+            "feast",
+            "hana",
+            "hive",
+            "hive-metastore",
+            "iceberg",
+            "iceberg-catalog",
+            "kafka-connect",
+            "ldap",
+            "slack",
+            "mssql",
+            "mssql-odbc",
+            "mysql",
+            "mariadb",
+            "tidb",
+            "rdf",
+            "redash",
+            "starrocks",
+            "vertica",
+            "vertexai",
+            "montecarlo",
+        ]
+        if plugin
+        for dependency in plugins[plugin]
+    ),
+}
+
+entry_points = {
+    "console_scripts": ["orrery = orrery.entrypoints:main"],
+    "orrery.token_provider.plugins": [
+        "pat = orrery.ingestion.auth.pat:PatTokenProvider",
+        "k8s_oidc = orrery.ingestion.auth.k8s_projected:K8sProjectedTokenProvider",
+        "azure_entra = orrery.ingestion.auth.azure_entra:AzureEntraTokenProvider",
+        "oidc_client_credentials = orrery.ingestion.auth.oidc_client_credentials:OidcClientCredentialsTokenProvider",
+        "oauth_session = orrery.ingestion.auth.oauth_session:OAuthSessionTokenProvider",
+    ],
+    "sqlalchemy.dialects": [
+        "doris.pymysql = orrery.ingestion.source.sql.doris.doris_dialect:DorisDialect",
+    ],
+    "orrery.ingestion.source.plugins": [
+        "abs = orrery.ingestion.source.abs.source:ABSSource",
+        "aerospike = orrery.ingestion.source.aerospike:AerospikeSource",
+        "csv-enricher = orrery.ingestion.source.csv_enricher:CSVEnricherSource",
+        "file = orrery.ingestion.source.file:GenericFileSource",
+        "orrery = orrery.ingestion.source.orrery.orrery_source:OrrerySource",
+        "sqlalchemy = orrery.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
+        "airbyte = orrery.ingestion.source.airbyte.source:AirbyteSource",
+        "athena = orrery.ingestion.source.sql.athena:AthenaSource",
+        "azure-ad = orrery.ingestion.source.identity.azure_ad:AzureADSource",
+        "azure-data-factory = orrery.ingestion.source.azure_data_factory.adf_source:AzureDataFactorySource",
+        "fabric-onelake = orrery.ingestion.source.fabric.onelake.source:FabricOneLakeSource",
+        "fabric-data-factory = orrery.ingestion.source.fabric.data_factory.source:FabricDataFactorySource",
+        "bigid = orrery.ingestion.source.bigid.bigid_source:BigIDSource",
+        "bigquery = orrery.ingestion.source.bigquery_v2.bigquery:BigqueryV2Source",
+        "bigquery-queries = orrery.ingestion.source.bigquery_v2.bigquery_queries:BigQueryQueriesSource",
+        "clickhouse = orrery.ingestion.source.sql.clickhouse:ClickHouseSource",
+        "clickhouse-usage = orrery.ingestion.source.usage.clickhouse_usage:ClickHouseUsageSource",
+        "cockroachdb = orrery.ingestion.source.sql.cockroachdb:CockroachDBSource",
+        "confluence = orrery.ingestion.source.confluence.confluence_source:ConfluenceSource",
+        "google-drive = orrery.ingestion.source.google_drive.google_drive_source:GoogleDriveSource",
+        "delta-lake = orrery.ingestion.source.delta_lake:DeltaLakeSource",
+        "s3 = orrery.ingestion.source.s3:S3Source",
+        "db2 = orrery.ingestion.source.sql.db2:Db2Source",
+        "dbt = orrery.ingestion.source.dbt.dbt_core:DBTCoreSource",
+        "dbt-cloud = orrery.ingestion.source.dbt.dbt_cloud:DBTCloudSource",
+        "dremio = orrery.ingestion.source.dremio.dremio_source:DremioSource",
+        "druid = orrery.ingestion.source.sql.druid:DruidSource",
+        "dynamodb = orrery.ingestion.source.dynamodb.dynamodb:DynamoDBSource",
+        "elasticsearch = orrery.ingestion.source.elastic_search:ElasticsearchSource",
+        "excel = orrery.ingestion.source.excel.source:ExcelSource",
+        "feast = orrery.ingestion.source.feast:FeastRepositorySource",
+        "flink = orrery.ingestion.source.flink.source:FlinkSource",
+        "grafana = orrery.ingestion.source.grafana.grafana_source:GrafanaSource",
+        "glue = orrery.ingestion.source.aws.glue:GlueSource",
+        "sagemaker = orrery.ingestion.source.aws.sagemaker:SagemakerSource",
+        "hana = orrery.ingestion.source.sql.hana.hana:HanaSource",
+        "hive = orrery.ingestion.source.sql.hive.hive_source:HiveSource",
+        "hive-metastore = orrery.ingestion.source.sql.hive.hive_metastore_source:HiveMetastoreSource",
+        "json-schema = orrery.ingestion.source.schema.json_schema:JsonSchemaSource",
+        "kafka = orrery.ingestion.source.kafka.kafka:KafkaSource",
+        "kafka-connect = orrery.ingestion.source.kafka_connect.kafka_connect:KafkaConnectSource",
+        "kinesis = orrery.ingestion.source.kinesis.kinesis:KinesisSource",
+        "langfuse = orrery.ingestion.source.langfuse.langfuse:LangfuseSource",
+        "sqs = orrery.ingestion.source.aws_messaging.sqs_source:SqsSource",
+        "sns = orrery.ingestion.source.aws_messaging.sns_source:SnsSource",
+        "ldap = orrery.ingestion.source.ldap:LDAPSource",
+        "looker = orrery.ingestion.source.looker.looker_source:LookerDashboardSource",
+        "lookml = orrery.ingestion.source.looker.lookml_source:LookMLSource",
+        "orrery-gc = orrery.ingestion.source.gc.orrery_gc:OrreryGcSource",
+        "orrery-debug = orrery.ingestion.source.debug.orrery_debug:OrreryDebugSource",
+        "orrery-documents = orrery.ingestion.source.orrery_documents.orrery_documents_source:OrreryDocumentsSource",
+        "orrery-apply = orrery.ingestion.source.apply.orrery_apply:OrreryApplySource",
+        "orrery-mock-data = orrery.ingestion.source.mock_data.orrery_mock_data:OrreryMockDataSource",
+        "orrery-lineage-file = orrery.ingestion.source.metadata.lineage:LineageFileSource",
+        "orrery-business-glossary = orrery.ingestion.source.metadata.business_glossary:BusinessGlossaryFileSource",
+        "dataplex = orrery.ingestion.source.dataplex.dataplex:DataplexSource",
+        "mlflow = orrery.ingestion.source.mlflow:MLflowSource",
+        "mode = orrery.ingestion.source.mode:ModeSource",
+        "mongodb = orrery.ingestion.source.mongodb:MongoDBSource",
+        "mssql = orrery.ingestion.source.sql.mssql:SQLServerSource",
+        "mysql = orrery.ingestion.source.sql.mysql:MySQLSource",
+        "mariadb = orrery.ingestion.source.sql.mariadb:MariaDBSource",
+        "tidb = orrery.ingestion.source.sql.tidb:TiDBSource",
+        "matillion-dpc = orrery.ingestion.source.matillion_dpc.matillion:MatillionSource",
+        "cube = orrery.ingestion.source.cube.cube:CubeSource",
+        "doris = orrery.ingestion.source.sql.doris.doris_source:DorisSource",
+        "okta = orrery.ingestion.source.identity.okta:OktaSource",
+        "oracle = orrery.ingestion.source.sql.oracle:OracleSource",
+        "postgres = orrery.ingestion.source.sql.postgres:PostgresSource",
+        "rdf = orrery.ingestion.source.rdf.ingestion.rdf_source:RDFSource",
+        "redash = orrery.ingestion.source.redash:RedashSource",
+        "redshift = orrery.ingestion.source.redshift.redshift:RedshiftSource",
+        "sap-datasphere = orrery.ingestion.source.sap_datasphere.source:SapDatasphereSource",
+        "slack = orrery.ingestion.source.slack.slack:SlackSource",
+        "sqlmesh = orrery.ingestion.source.sqlmesh.sqlmesh_source:SqlmeshSource",
+        "snowflake = orrery.ingestion.source.snowflake.snowflake_v2:SnowflakeV2Source",
+        "snowflake-summary = orrery.ingestion.source.snowflake.snowflake_summary:SnowflakeSummarySource",
+        "snowflake-queries = orrery.ingestion.source.snowflake.snowflake_queries:SnowflakeQueriesSource",
+        "snowplow = orrery.ingestion.source.snowplow.snowplow:SnowplowSource",
+        "superset = orrery.ingestion.source.superset:SupersetSource",
+        "preset = orrery.ingestion.source.preset:PresetSource",
+        "tableau = orrery.ingestion.source.tableau.tableau:TableauSource",
+        "openapi = orrery.ingestion.source.openapi:OpenApiSource",
+        "metabase = orrery.ingestion.source.metabase.source:MetabaseSource",
+        "microstrategy = orrery.ingestion.source.microstrategy.source:MicroStrategySource",
+        "teradata = orrery.ingestion.source.sql.teradata:TeradataSource",
+        "starrocks = orrery.ingestion.source.sql.starrocks:StarRocksSource",
+        "thoughtspot = orrery.ingestion.source.thoughtspot.source:ThoughtSpotSource",
+        "trino = orrery.ingestion.source.sql.trino:TrinoSource",
+        "starburst-trino-usage = orrery.ingestion.source.usage.starburst_trino_usage:TrinoUsageSource",
+        "nifi = orrery.ingestion.source.nifi:NifiSource",
+        "powerbi = orrery.ingestion.source.powerbi.powerbi:PowerBiDashboardSource",
+        "powerbi-report-server = orrery.ingestion.source.powerbi_report_server:PowerBiReportServerDashboardSource",
+        "iceberg = orrery.ingestion.source.iceberg.iceberg:IcebergSource",
+        "informatica = orrery.ingestion.source.informatica.source:InformaticaSource",
+        "informix = orrery.ingestion.source.informix.source:InformixSource",
+        "vertica = orrery.ingestion.source.sql.vertica:VerticaSource",
+        "presto = orrery.ingestion.source.sql.presto:PrestoSource",
+        # This is only here for backward compatibility. Use the `hive-metastore` source instead.
+        "presto-on-hive = orrery.ingestion.source.sql.hive.hive_metastore_source:HiveMetastoreSource",
+        "pulsar = orrery.ingestion.source.pulsar:PulsarSource",
+        "salesforce = orrery.ingestion.source.salesforce:SalesforceSource",
+        "demo-data = orrery.ingestion.source.demo_data:DemoDataSource",
+        "unity-catalog = orrery.ingestion.source.unity.source:UnityCatalogSource",
+        "notion = orrery.ingestion.source.notion.notion_source:NotionSource",
+        "github-documents = orrery.ingestion.source.github_documents.github_documents_source:GitHubDocumentsSource",
+        "gcs = orrery.ingestion.source.gcs.gcs_source:GCSSource",
+        "sql-queries = orrery.ingestion.source.sql_queries:SqlQueriesSource",
+        "dlt = orrery.ingestion.source.dlt.dlt:DltSource",
+        "fivetran = orrery.ingestion.source.fivetran.fivetran:FivetranSource",
+        "snaplogic = orrery.ingestion.source.snaplogic.snaplogic:SnaplogicSource",
+        "qlik-sense = orrery.ingestion.source.qlik_sense.qlik_sense:QlikSenseSource",
+        "quicksight = orrery.ingestion.source.quicksight.quicksight:QuickSightSource",
+        "sigma = orrery.ingestion.source.sigma.sigma:SigmaSource",
+        "montecarlo = orrery.ingestion.source.montecarlo.source:MonteCarloSource",
+        "sac = orrery.ingestion.source.sac.sac:SACSource",
+        "cassandra = orrery.ingestion.source.cassandra.cassandra:CassandraSource",
+        "neo4j = orrery.ingestion.source.neo4j.neo4j_source:Neo4jSource",
+        "odcs = orrery.ingestion.source.odcs.odcs_source:ODCSSource",
+        "vertexai = orrery.ingestion.source.vertexai.vertexai:VertexAISource",
+        "hex = orrery.ingestion.source.hex.hex:HexSource",
+        "hightouch = orrery.ingestion.source.hightouch.hightouch:HightouchSource",
+        "timescaledb = orrery.ingestion.source.sql.timescaledb:TimescaleDBSource",
+        "omni = orrery.ingestion.source.omni.omni:OmniSource",
+        "pinecone = orrery.ingestion.source.pinecone.pinecone_source:PineconeSource",
+    ],
+    "orrery.ingestion.transformer.plugins": [
+        "pattern_cleanup_ownership = orrery.ingestion.transformer.pattern_cleanup_ownership:PatternCleanUpOwnership",
+        "simple_remove_dataset_ownership = orrery.ingestion.transformer.remove_dataset_ownership:SimpleRemoveDatasetOwnership",
+        "mark_dataset_status = orrery.ingestion.transformer.mark_dataset_status:MarkDatasetStatus",
+        "set_dataset_browse_path = orrery.ingestion.transformer.add_dataset_browse_path:AddDatasetBrowsePathTransformer",
+        "set_browse_path = orrery.ingestion.transformer.set_browse_path:SetBrowsePathTransformer",
+        "add_dataset_ownership = orrery.ingestion.transformer.add_dataset_ownership:AddDatasetOwnership",
+        "simple_add_dataset_ownership = orrery.ingestion.transformer.add_dataset_ownership:SimpleAddDatasetOwnership",
+        "pattern_add_dataset_ownership = orrery.ingestion.transformer.add_dataset_ownership:PatternAddDatasetOwnership",
+        # Aliases without "dataset" prefix — support all entity types including container
+        "add_ownership = orrery.ingestion.transformer.add_ownership:AddOwnership",
+        "simple_add_ownership = orrery.ingestion.transformer.add_ownership:SimpleAddOwnership",
+        "pattern_add_ownership = orrery.ingestion.transformer.add_ownership:PatternAddOwnership",
+        "add_dataset_domain = orrery.ingestion.transformer.dataset_domain:AddDatasetDomain",
+        "simple_add_dataset_domain = orrery.ingestion.transformer.dataset_domain:SimpleAddDatasetDomain",
+        "pattern_add_dataset_domain = orrery.ingestion.transformer.dataset_domain:PatternAddDatasetDomain",
+        # Aliases without "dataset" prefix — support all entity types including container
+        "add_domain = orrery.ingestion.transformer.add_domain:AddDomain",
+        "simple_add_domain = orrery.ingestion.transformer.add_domain:SimpleAddDomain",
+        "pattern_add_domain = orrery.ingestion.transformer.add_domain:PatternAddDomain",
+        "add_dataset_tags = orrery.ingestion.transformer.add_dataset_tags:AddDatasetTags",
+        "simple_add_dataset_tags = orrery.ingestion.transformer.add_dataset_tags:SimpleAddDatasetTags",
+        "pattern_add_dataset_tags = orrery.ingestion.transformer.add_dataset_tags:PatternAddDatasetTags",
+        "extract_dataset_tags = orrery.ingestion.transformer.extract_dataset_tags:ExtractDatasetTags",
+        "add_dataset_terms = orrery.ingestion.transformer.add_dataset_terms:AddDatasetTerms",
+        "simple_add_dataset_terms = orrery.ingestion.transformer.add_dataset_terms:SimpleAddDatasetTerms",
+        "pattern_add_dataset_terms = orrery.ingestion.transformer.add_dataset_terms:PatternAddDatasetTerms",
+        "add_dataset_properties = orrery.ingestion.transformer.add_dataset_properties:AddDatasetProperties",
+        "simple_add_dataset_properties = orrery.ingestion.transformer.add_dataset_properties:SimpleAddDatasetProperties",
+        "pattern_add_dataset_schema_terms = orrery.ingestion.transformer.add_dataset_schema_terms:PatternAddDatasetSchemaTerms",
+        "set_attribution = orrery.ingestion.transformer.set_attribution:SetAttributionTransformer",
+        "pattern_add_dataset_schema_tags = orrery.ingestion.transformer.add_dataset_schema_tags:PatternAddDatasetSchemaTags",
+        "extract_ownership_from_tags = orrery.ingestion.transformer.extract_ownership_from_tags:ExtractOwnersFromTagsTransformer",
+        "add_dataset_dataproduct = orrery.ingestion.transformer.add_dataset_dataproduct:AddDatasetDataProduct",
+        "simple_add_dataset_dataproduct = orrery.ingestion.transformer.add_dataset_dataproduct:SimpleAddDatasetDataProduct",
+        "pattern_add_dataset_dataproduct = orrery.ingestion.transformer.add_dataset_dataproduct:PatternAddDatasetDataProduct",
+        "replace_external_url = orrery.ingestion.transformer.replace_external_url:ReplaceExternalUrlDataset",
+        "replace_external_url_container = orrery.ingestion.transformer.replace_external_url:ReplaceExternalUrlContainer",
+        "pattern_cleanup_dataset_usage_user = orrery.ingestion.transformer.pattern_cleanup_dataset_usage_user:PatternCleanupDatasetUsageUser",
+        "domain_mapping_based_on_tags = orrery.ingestion.transformer.dataset_domain_based_on_tags:DatasetTagDomainMapper",
+        "tags_to_term = orrery.ingestion.transformer.tags_to_terms:TagsToTermMapper",
+        "tags_to_structured_properties = orrery.ingestion.transformer.tags_to_structured_properties:TagsToStructuredPropertiesTransformer",
+    ],
+    "orrery.ingestion.sink.plugins": [
+        "file = orrery.ingestion.sink.file:FileSink",
+        "console = orrery.ingestion.sink.console:ConsoleSink",
+        "blackhole = orrery.ingestion.sink.blackhole:BlackHoleSink",
+        "orrery-kafka = orrery.ingestion.sink.orrery_kafka:OrreryKafkaSink",
+        "orrery-pg-queue = orrery.ingestion.sink.orrery_pg_queue:OrreryPgQueueSink",
+        "orrery-rest = orrery.ingestion.sink.orrery_rest:OrreryRestSink",
+        "orrery-lite = orrery.ingestion.sink.orrery_lite:OrreryLiteSink",
+    ],
+    "orrery.ingestion.checkpointing_provider.plugins": [
+        "orrery = orrery.ingestion.source.state_provider.orrery_ingestion_checkpointing_provider:OrreryIngestionCheckpointingProvider",
+        "file = orrery.ingestion.source.state_provider.file_ingestion_checkpointing_provider:FileIngestionCheckpointingProvider",
+    ],
+    "orrery.ingestion.reporting_provider.plugins": [
+        "orrery = orrery.ingestion.reporting.orrery_ingestion_run_summary_provider:OrreryIngestionRunSummaryProvider",
+        "file = orrery.ingestion.reporting.file_reporter:FileReporter",
+    ],
+    "orrery.custom_packages": [],
+    "orrery.fs.plugins": [
+        "s3 = orrery.ingestion.fs.s3_fs:S3FileSystem",
+        "file = orrery.ingestion.fs.local_fs:LocalFileSystem",
+        "http = orrery.ingestion.fs.http_fs:HttpFileSystem",
+    ],
+}
+
+
+setuptools.setup(
+    # Package metadata.
+    name=package_metadata["__package_name__"],
+    version=_version,
+    url="https://orrery.dev/",
+    project_urls={
+        "Documentation": "https://docs.orrery.dev/",
+        "Source": "https://github.com/Dxlxz/orrery",
+        "Changelog": "https://github.com/dxlxz/orrery/releases",
+        "Releases": "https://github.com/dxlxz/orrery/releases",
+    },
+    license="Apache-2.0",
+    description="Orrery ingestion framework and CLI — connect, extract, and push metadata from 50+ data sources into your Orrery catalog",
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: System Administrators",
+        "Operating System :: Unix",
+        "Operating System :: POSIX :: Linux",
+        "Environment :: Console",
+        "Environment :: MacOS X",
+        "Topic :: Software Development",
+    ],
+    # Package info.
+    zip_safe=False,
+    python_requires=">=3.10",
+    package_dir={"": "src"},
+    packages=setuptools.find_namespace_packages(where="./src"),
+    package_data={
+        "orrery": ["py.typed", "constraints.txt"],
+        "orrery.metadata": ["schema.avsc"],
+        "orrery.metadata.schemas": ["*.avsc"],
+        "orrery.ingestion.source.powerbi.m_query.mquery_bridge": ["bundle.js.gz"],
+        "orrery.ingestion.autogenerated": ["*.json"],
+        # Read at runtime by montecarlo/constants.py:get_known_data_platforms().
+        "orrery.ingestion.autogenerated.connector_registry": ["orrery.json"],
+        "orrery.ingestion.source.odcs.odcs_schema": ["*.json"],
+        "orrery.cli.gql": ["*.gql"],
+        "orrery.cli.resources": ["*.md"],
+        "orrery.cli.datapack.resources": ["*.md", "*.json"],
+    },
+    # Install .pth files that run at interpreter startup:
+    # - setproctitle patch avoids a SIGSEGV when a multi-threaded process forks
+    #   and something calls setproctitle (macOS).
+    # - force_pure_python_sqlglot honours ORRERY_SQLGLOT_DISABLE_C by loading
+    #   sqlglot from .py instead of the mypyc .so extensions.
+    data_files=[
+        (
+            sysconfig.get_path("purelib"),
+            [
+                "orrery_setproctitle_patch.pth",
+                "orrery_force_pure_python_sqlglot.pth",
+            ],
+        ),
+    ],
+    entry_points=entry_points,
+    # Dependencies.
+    install_requires=list(base_requirements | framework_common),
+    extras_require={
+        "base": list(framework_common),
+        **{
+            plugin: list(framework_common | dependencies)
+            for (plugin, dependencies) in plugins.items()
+        },
+        "all": list(
+            framework_common.union(
+                *[
+                    requirements
+                    for plugin, requirements in plugins.items()
+                    if plugin not in all_exclude_plugins
+                ]
+            )
+        ),
+        "sso": list(framework_common | {"playwright>=1.40.0,<2.0.0"}),
+        "dev": list(dev_requirements),
+        "docs": list(
+            docs_requirements
+        ),  # For documentation generation (requires Python 3.11+)
+        "lint": list(lint_requirements),
+        "testing-utils": list(test_api_requirements),  # To import `orrery.testing`
+        "integration-tests": list(full_test_dev_requirements),
+        "debug": list(debug_requirements),
+    },
+)

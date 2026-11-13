@@ -1,0 +1,6 @@
+{
+    "updates.defaultTitle": "Orrery-uppdateringar: {{month}}",
+    "updates.defaultCtaText": "Utforska Orrery Cloud {{version}}",
+    "updates.moreInThisRelease": "Mer i den här versionen",
+    "upload.failedTitle": "Uppladdningen misslyckades"
+}

@@ -1,0 +1,196 @@
+
+x-orrery-frontend-service: &orrery-frontend-service
+  hostname: orrery-frontend-react
+  image: ${ORRERY_FRONTEND_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-frontend-react}:${ORRERY_FRONTEND_VERSION:-${ORRERY_VERSION:-quickstart}}
+  ports:
+    - ${ORRERY_MAPPED_FRONTEND_PORT:-9002}:9002
+  expose:
+    - 4319
+  env_file:
+    - orrery-frontend/env/docker.env
+    - ${ORRERY_LOCAL_COMMON_ENV:-empty.env}
+    - ${ORRERY_LOCAL_FRONTEND_ENV:-empty2.env}
+  environment: &orrery-frontend-service-env
+    KAFKA_BOOTSTRAP_SERVER: broker:29092
+    ORRERY_GMS_HOST: ${ORRERY_GMS_HOST:-orrery-gms}
+    ORRERY_SYSTEM_CLIENT_SECRET: ${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}
+    # Play 3 maps this to play.http.secret.key; HS256 requires >=256 bits (see ApplicationSecret).
+    # Overrides env_file when unset on host; use a long random value in production.
+    ORRERY_SECRET: ${ORRERY_SECRET:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    THEME_V2_DEFAULT: ${THEME_V2_DEFAULT:-true}
+    PLAY_HTTP_CONTEXT: ${ORRERY_BASE_PATH:-/}
+    ORRERY_BASE_PATH: ${ORRERY_BASE_PATH:-/}
+    ORRERY_GMS_BASE_PATH: ${ORRERY_GMS_BASE_PATH:-/}
+    LOG_AGGREGATOR_ENDPOINT: ${LOG_AGGREGATOR_ENDPOINT:-}
+  volumes:
+    - ${HOME}/.orrery/plugins:/etc/orrery/plugins
+
+x-orrery-frontend-service-dev: &orrery-frontend-service-dev
+  <<: *orrery-frontend-service
+  image: ${ORRERY_FRONTEND_IMAGE:-${ORRERY_REPO:-dxlxz}/orrery-frontend-react}:${ORRERY_FRONTEND_VERSION:-${ORRERY_VERSION:-debug}}
+  ports:
+    - ${ORRERY_MAPPED_FRONTEND_DEBUG_PORT:-5002}:5002
+    - ${ORRERY_MAPPED_FRONTEND_PORT:-9002}:9002
+  environment:
+    <<: *orrery-frontend-service-env
+    JAVA_TOOL_OPTIONS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5002
+    ORRERY_ANALYTICS_ENABLED: ${ORRERY_ANALYTICS_ENABLED:-true}
+  volumes:
+    - ../../orrery-frontend/build/stage/main:/orrery-frontend
+    # Removed nested mount - causes virtiofs mountpoint error in Docker Desktop >= 4.42.0
+    # The file is already in the Docker image, so this mount isn't needed.
+    # If you need to override it for development, copy it to the build directory instead.
+    # - ./monitoring/client-prometheus-config.yaml:/orrery-frontend/client-prometheus-config.yaml
+
+services:
+  frontend-quickstart:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart
+      - quickstart-frontend
+      - quickstart-opensearch2
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+  frontend-quickstart-opensearch3:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-opensearch3
+    depends_on:
+      system-update-quickstart-opensearch3:
+        condition: service_completed_successfully
+  frontend-quickstart-cassandra:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-cassandra
+    depends_on:
+      system-update-quickstart-cassandra:
+        condition: service_completed_successfully
+  frontend-quickstart-postgres:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-postgres
+    depends_on:
+      system-update-quickstart-postgres:
+        condition: service_completed_successfully
+  frontend-quickstart-postgres-consumers:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-postgres-consumers
+    depends_on:
+      system-update-quickstart-postgres-consumers:
+        condition: service_completed_successfully
+  frontend-quickstart-consumers:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-consumers
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+  frontend-quickstart-consumers-cdc:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-consumers-cdc
+    depends_on:
+      system-update-quickstart-cdc:
+        condition: service_completed_successfully
+  frontend-quickstart-postgres-cdc:
+    <<: *orrery-frontend-service
+    profiles:
+      - quickstart-postgres-cdc
+    depends_on:
+      system-update-quickstart-postgres-cdc:
+        condition: service_completed_successfully
+  frontend-debug:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug
+      - debug-opensearch2
+    depends_on:
+      system-update-debug:
+        condition: service_completed_successfully
+  frontend-debug-aws:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-aws
+    depends_on:
+      system-update-debug-aws:
+        condition: service_completed_successfully
+  frontend-debug-min:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-min
+    depends_on:
+      system-update-debug:
+        condition: service_completed_successfully
+  frontend-debug-frontend:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-frontend
+    depends_on:
+      system-update-debug:
+        condition: service_completed_successfully
+  frontend-debug-postgres:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-postgres
+    depends_on:
+      system-update-debug-postgres:
+        condition: service_completed_successfully
+  frontend-debug-postgres-consumers:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-postgres-consumers
+    depends_on:
+      system-update-debug-postgres-consumers:
+        condition: service_completed_successfully
+  frontend-debug-cassandra:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-cassandra
+    depends_on:
+      system-update-debug-cassandra:
+        condition: service_completed_successfully
+  frontend-debug-consumers:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-consumers
+    depends_on:
+      system-update-debug-consumers:
+        condition: service_completed_successfully
+  frontend-debug-consumers-cdc:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-consumers-cdc
+    depends_on:
+      system-update-debug-consumers-cdc:
+        condition: service_completed_successfully
+  frontend-debug-posgres-cdc:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-postgres-cdc
+    depends_on:
+      system-update-debug-postgres-cdc:
+        condition: service_completed_successfully
+
+  frontend-debug-neo4j:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-neo4j
+    depends_on:
+      system-update-debug-neo4j:
+        condition: service_completed_successfully
+  frontend-debug-elasticsearch:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-elasticsearch
+    depends_on:
+      system-update-debug-elasticsearch:
+        condition: service_completed_successfully
+  frontend-debug-opensearch3:
+    <<: *orrery-frontend-service-dev
+    profiles:
+      - debug-opensearch3
+    depends_on:
+      system-update-debug-opensearch3:
+        condition: service_completed_successfully

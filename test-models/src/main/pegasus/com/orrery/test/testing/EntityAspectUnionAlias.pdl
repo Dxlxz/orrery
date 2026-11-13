@@ -1,0 +1,9 @@
+namespace com.orrery.test.testing
+
+/**
+ * For unit tests
+ */
+typeref EntityAspectUnionAlias = union[
+  foo: AspectFoo,
+  bar: AspectBar
+]

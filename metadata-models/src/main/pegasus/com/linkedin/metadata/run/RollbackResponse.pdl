@@ -1,0 +1,16 @@
+namespace com.linkedin.metadata.run
+
+record RollbackResponse {
+    aspectRowSummaries: array[AspectRowSummary]
+    entitiesAffected: long
+    aspectsAffected: long
+    entitiesDeleted: optional long
+    aspectsReverted: optional long
+    unsafeEntitiesCount: optional long
+    unsafeEntities: array[UnsafeEntityInfo]
+    /**
+     * Rows of the run left in place because this version doesn't know their entity type or aspect
+     * (written by a newer version before a rollback). Absent when none were left.
+     */
+    aspectsLeftInPlace: optional long
+}

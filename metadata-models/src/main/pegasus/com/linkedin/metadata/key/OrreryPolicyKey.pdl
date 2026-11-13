@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Orrery Policy
+ */
+@Aspect = {
+  "name": "orreryPolicyKey"
+}
+record OrreryPolicyKey {
+  /**
+   * A unique id for the Orrery access policy record. Generated on the server side at policy creation time.
+   */
+  id: string
+}

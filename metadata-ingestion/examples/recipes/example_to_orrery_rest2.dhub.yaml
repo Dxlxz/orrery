@@ -1,0 +1,11 @@
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/file for complete documentation
+source:
+  type: "file"
+  config:
+    filename: "./examples/mce_files/bootstrap_mce2.json"
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

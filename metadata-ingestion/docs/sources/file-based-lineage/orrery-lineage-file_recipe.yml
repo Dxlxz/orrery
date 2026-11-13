@@ -1,0 +1,10 @@
+source:
+  type: orrery-lineage-file
+  config:
+    # Coordinates
+    file: /path/to/file_lineage.yml
+    # Whether we want to query orrery-gms for upstream data
+    preserve_upstream: False
+
+sink:
+# sink configs

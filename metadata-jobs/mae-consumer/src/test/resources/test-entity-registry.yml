@@ -1,0 +1,39 @@
+entities:
+  - name: dataPlatform
+    category: core
+    keyAspect: dataPlatformKey
+    aspects:
+      - dataPlatformInfo
+  - name: orreryIngestionSource
+    keyAspect: orreryIngestionSourceKey
+    aspects:
+      - orreryIngestionSourceInfo
+  - name: orrerySecret
+    keyAspect: orrerySecretKey
+    aspects:
+      - orrerySecretValue
+  - name: orreryExecutionRequest
+    keyAspect: orreryExecutionRequestKey
+    aspects:
+      - orreryExecutionRequestInput
+      - orreryExecutionRequestSignal
+      - orreryExecutionRequestResult
+  - name: dataset
+    keyAspect: datasetKey
+    aspects:
+      - upstreamLineage
+  - name: chart
+    keyAspect: chartKey
+    aspects:
+      - domains
+  - name: incident
+    keyAspect: incidentKey
+    aspects:
+      - incidentInfo
+      - status
+  - name: schemaField
+    category: core
+    keyAspect: schemaFieldKey
+    aspects: []
+events:
+  - name: entityChangeEvent

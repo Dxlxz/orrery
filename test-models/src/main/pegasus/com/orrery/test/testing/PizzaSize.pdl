@@ -1,0 +1,11 @@
+namespace com.orrery.test.testing
+
+/**
+ * Possible sizes of pizzas.
+ */
+enum PizzaSize {
+  PERSONAL,
+  MEDIUM,
+  LARGE,
+  SICILIAN
+}

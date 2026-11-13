@@ -1,0 +1,190 @@
+query getBrowsePaths($input: BrowsePathsInput!) {
+    browsePaths(input: $input) {
+        path
+    }
+}
+
+query getBrowseResults($input: BrowseInput!) {
+    browse(input: $input) {
+        entities {
+            urn
+            type
+            ... on HasName {
+                name
+            }
+            ... on HasPlatform {
+                platform {
+                    ...platformFields
+                }
+            }
+            ... on HasOwnership {
+                ownership {
+                    ...ownershipFields
+                }
+            }
+            ... on HasGlossaryTerms {
+                glossaryTerms {
+                    ...glossaryTerms
+                }
+            }
+            ... on HasSubTypes {
+                subTypes {
+                    typeNames
+                }
+            }
+            ... on HasDomain {
+                domain {
+                    ...entityDomain
+                }
+            }
+            ... on HasDescription {
+                description
+            }
+            ... on Dataset {
+                origin
+                properties {
+                    name
+                    description
+                }
+                editableProperties {
+                    name
+                    description
+                }
+                globalTags {
+                    ...globalTagsFields
+                }
+                ...entityDataProduct
+            }
+            ... on Dashboard {
+                urn
+                type
+                tool
+                dashboardId
+                properties {
+                    name
+                    description
+                    externalUrl
+                    access
+                    lastModified {
+                        time
+                    }
+                }
+                globalTags {
+                    ...globalTagsFields
+                }
+                ...entityDataProduct
+                editableProperties {
+                    description
+                }
+            }
+            ... on GlossaryTerm {
+                properties {
+                    name
+                    description
+                    definition
+                    termSource
+                    sourceRef
+                    sourceUrl
+                    customProperties {
+                        key
+                        value
+                    }
+                }
+            }
+            ... on Chart {
+                urn
+                type
+                tool
+                chartId
+                properties {
+                    name
+                    description
+                    externalUrl
+                    type
+                    access
+                    lastModified {
+                        time
+                    }
+                }
+                globalTags {
+                    ...globalTagsFields
+                }
+                ...entityDataProduct
+                editableProperties {
+                    description
+                }
+            }
+            ... on DataFlow {
+                urn
+                type
+                orchestrator
+                flowId
+                cluster
+                properties {
+                    name
+                    description
+                    project
+                }
+                globalTags {
+                    ...globalTagsFields
+                }
+                ...entityDataProduct
+                editableProperties {
+                    description
+                }
+            }
+            ... on DataJob {
+                urn
+                type
+                dataFlow {
+                    ...nonRecursiveDataFlowFields
+                }
+                jobId
+                properties {
+                    name
+                    description
+                }
+                globalTags {
+                    ...globalTagsFields
+                }
+                ...entityDataProduct
+                editableProperties {
+                    description
+                }
+            }
+            ... on MLFeatureTable {
+                urn
+                type
+                featureTableProperties {
+                    description
+                    mlFeatures {
+                        urn
+                    }
+                    mlPrimaryKeys {
+                        urn
+                    }
+                }
+            }
+            ... on MLModel {
+                origin
+                globalTags {
+                    ...globalTagsFields
+                }
+            }
+            ... on MLModelGroup {
+                origin
+            }
+        }
+        groups {
+            name
+            count
+        }
+        start
+        count
+        total
+        metadata {
+            path
+            totalNumEntities
+        }
+    }
+}

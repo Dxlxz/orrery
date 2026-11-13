@@ -1,0 +1,9 @@
+source:
+  type: "file"
+  config:
+    filename: "/bootstrap_mce.json"
+
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://orrery-gms:8080"

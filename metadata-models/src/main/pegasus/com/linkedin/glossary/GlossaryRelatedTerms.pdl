@@ -1,0 +1,128 @@
+namespace com.linkedin.glossary
+
+import com.linkedin.common.AuditStamp
+import com.linkedin.common.GlossaryTermUrn
+
+/**
+ * Has A / Is A lineage information about a glossary Term reporting the lineage
+ */
+ @Aspect = {
+  "name": "glossaryRelatedTerms"
+}
+record GlossaryRelatedTerms {
+
+  /**
+   * The relationship Is A with glossary term
+   */
+  @Relationship = {
+    "/*": {
+      "name": "IsA",
+      "entityTypes": [ "glossaryTerm" ]
+    }
+  }
+  @Searchable = {
+    "/*": {
+      "fieldName": "isRelatedTerms",
+      "fieldType": "URN",
+      "queryByDefault": false,
+      "hasValuesFieldName": "hasGlossaryTerms",
+      "v3": {
+        "queryByDefault": false,
+        "boostScore": 0.25,
+        "searchLabel": "glossaryTerms",
+        "degree": 1,
+        "mappings": [
+          { "type": "URN" }
+        ]
+      }
+    }
+  }
+  isRelatedTerms: optional array[GlossaryTermUrn]
+
+  /**
+   * The relationship Has A with glossary term
+   */
+  @Relationship = {
+    "/*": {
+      "name": "HasA",
+      "entityTypes": [ "glossaryTerm" ]
+    }
+  }
+  @Searchable = {
+    "/*": {
+      "fieldName": "hasRelatedTerms",
+      "fieldType": "URN",
+      "queryByDefault": false,
+      "hasValuesFieldName": "hasGlossaryTerms",
+      "v3": {
+        "queryByDefault": false,
+        "boostScore": 0.25,
+        "searchLabel": "glossaryTerms",
+        "degree": 1,
+        "mappings": [
+          { "type": "URN" }
+        ]
+      }
+    }
+  }
+  hasRelatedTerms: optional array[GlossaryTermUrn]
+
+  /**
+   * The relationship Has Value with glossary term.
+   * These are fixed value a term has. For example a ColorEnum where RED, GREEN and YELLOW are fixed values.
+   */
+  @Relationship = {
+    "/*": {
+      "name": "HasValue",
+      "entityTypes": [ "glossaryTerm" ]
+    }
+  }
+  @Searchable = {
+    "/*": {
+      "fieldName": "values",
+      "fieldType": "URN",
+      "queryByDefault": false,
+      "hasValuesFieldName": "hasGlossaryTerms",
+      "v3": {
+        "queryByDefault": false,
+        "boostScore": 0.25,
+        "searchLabel": "glossaryTerms",
+        "degree": 1,
+        "mappings": [
+          { "type": "URN" }
+        ]
+      }
+    }
+  }
+  values: optional array[GlossaryTermUrn]
+
+
+  /**
+   * The relationship isRelatedTo with glossary term
+   */
+  @Relationship = {
+    "/*": {
+      "name": "IsRelatedTo",
+      "entityTypes": [ "glossaryTerm" ]
+    }
+  }
+  @Searchable = {
+    "/*": {
+      "fieldName": "relatedTerms",
+      "fieldType": "URN",
+      "boostScore": 0.5,
+      "hasValuesFieldName": "hasGlossaryTerms",
+      "v3": {
+        "queryByDefault": false,
+        "boostScore": 0.25,
+        "searchLabel": "glossaryTerms",
+        "degree": 1,
+        "mappings": [
+          { "type": "URN" }
+        ]
+      }
+    }
+  }
+  relatedTerms: optional array[GlossaryTermUrn]
+
+}

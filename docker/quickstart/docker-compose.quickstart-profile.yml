@@ -1,0 +1,504 @@
+# This file is generated as part of build process. If any build changes cause this file to be modified, please check in the generated file
+name: orrery
+services:
+  frontend-quickstart:
+    profiles:
+    - quickstart
+    - quickstart-frontend
+    - quickstart-opensearch2
+    environment:
+      ELASTIC_CLIENT_HOST: elasticsearch
+      ELASTIC_CLIENT_PORT: '9200'
+      FRONTEND_BEFORE_SERVICE_UNBIND_TIMEOUT: 10s
+      FRONTEND_GRACEFUL_SHUTDOWN_ENABLED: 'false'
+      FRONTEND_SERVICE_REQUESTS_DONE_TIMEOUT: 65s
+      FRONTEND_SERVICE_STOP_TIMEOUT: 15s
+      JAVA_OPTS: -Xms512m -Xmx512m -Dhttp.port=9002 -Dconfig.file=orrery-frontend/conf/application.conf -Djava.security.auth.login.config=orrery-frontend/conf/jaas.conf
+        -Dlogback.configurationFile=orrery-frontend/conf/logback.xml -Dlogback.debug=false -Dpidfile.path=/dev/null
+      KAFKA_BOOTSTRAP_SERVER: broker:29092
+      LOG_AGGREGATOR_ENDPOINT: ''
+      ORRERY_APP_VERSION: ${ORRERY_VERSION}
+      ORRERY_BASE_PATH: /
+      ORRERY_GMS_BASE_PATH: /
+      ORRERY_GMS_HOST: orrery-gms
+      ORRERY_GMS_PORT: '8080'
+      ORRERY_PLAY_MEM_BUFFER_SIZE: 10MB
+      ORRERY_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ORRERY_SYSTEM_CLIENT_SECRET: ${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}
+      ORRERY_TRACKING_TOPIC: OrreryUsageEvent_v1
+      PLAY_HTTP_CONTEXT: /
+      THEME_V2_DEFAULT: 'true'
+    hostname: orrery-frontend-react
+    image: acryldata/orrery-frontend-react:${ORRERY_VERSION}
+    networks:
+      default: null
+    volumes:
+    - type: bind
+      source: ${HOME}/.orrery/plugins
+      target: /etc/orrery/plugins
+      bind:
+        create_host_path: true
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+        required: true
+    expose:
+    - '4319'
+    ports:
+    - mode: ingress
+      target: 9002
+      published: ${ORRERY_MAPPED_FRONTEND_PORT:-9002}
+      protocol: tcp
+  kafka-broker:
+    profiles:
+    - quickstart
+    - quickstart-backend
+    - quickstart-actions
+    - quickstart-frontend
+    - quickstart-storage
+    - quickstart-cassandra
+    - quickstart-postgres-cdc
+    - quickstart-consumers
+    - quickstart-consumers-cdc
+    - debug
+    - debug-min
+    - debug-orrery-actions
+    - debug-frontend
+    - debug-backend
+    - debug-postgres-cdc
+    - debug-cassandra
+    - debug-consumers
+    - debug-consumers-cdc
+    - debug-neo4j
+    - debug-elasticsearch
+    - debug-opensearch2
+    - debug-opensearch3
+    - debug-backend-aws
+    - debug-aws
+    - quickstart-opensearch2
+    - quickstart-opensearch3
+    command:
+    - /bin/bash
+    - -c
+    - |
+      # Generate KRaft clusterID
+      file_path="/var/lib/kafka/data/clusterID"
+
+      if [ ! -f "$$file_path" ]; then
+         /bin/kafka-storage random-uuid > $$file_path
+         echo "Cluster id has been created..."
+         # KRaft required step: Format the storage directory with a new cluster ID
+         kafka-storage format --ignore-formatted -t $$(cat "$$file_path") -c /etc/kafka/kafka.properties
+      fi
+
+      export CLUSTER_ID=$$(cat "$$file_path")
+      echo "CLUSTER_ID=$$CLUSTER_ID"
+
+      /etc/confluent/docker/run
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: BROKER://broker:29092,EXTERNAL://localhost:9092
+      KAFKA_BROKER_ID: '1'
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: 'false'
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:39092
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0'
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx512m
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,BROKER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: BROKER://broker:29092,EXTERNAL://broker:9092,CONTROLLER://broker:39092
+      KAFKA_LOG4J_LOGGERS: org.apache.kafka.image.loader.MetadataLoader=WARN
+      KAFKA_MAX_MESSAGE_BYTES: '5242880'
+      KAFKA_MESSAGE_MAX_BYTES: '5242880'
+      KAFKA_NODE_ID: '1'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_PROCESS_ROLES: controller, broker
+      KAFKA_ZOOKEEPER_CONNECT: null
+    hostname: broker
+    image: confluentinc/cp-kafka:8.2.2
+    networks:
+      default: null
+    volumes:
+    - type: volume
+      source: broker
+      target: /var/lib/kafka/data
+      volume: {}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - kafka-broker-api-versions --bootstrap-server broker:29092 >/dev/null 2>&1
+      timeout: 10s
+      interval: 5s
+      retries: 12
+      start_period: 1m0s
+    ports:
+    - mode: ingress
+      target: 9092
+      published: '9092'
+      protocol: tcp
+  mysql:
+    profiles:
+    - quickstart
+    - quickstart-backend
+    - quickstart-frontend
+    - quickstart-storage
+    - quickstart-consumers
+    - quickstart-consumers-cdc
+    - debug
+    - debug-min
+    - debug-orrery-actions
+    - debug-frontend
+    - debug-backend
+    - debug-consumers
+    - debug-consumers-cdc
+    - debug-neo4j
+    - debug-elasticsearch
+    - debug-opensearch2
+    - debug-opensearch3
+    - debug-backend-aws
+    - debug-aws
+    - quickstart-opensearch2
+    - quickstart-opensearch3
+    restart: on-failure
+    command:
+    - --character-set-server=utf8mb4
+    - --collation-server=utf8mb4_bin
+    - --default-authentication-plugin=caching_sha2_password
+    environment:
+      MYSQL_DATABASE: orrery
+      MYSQL_PASSWORD: orrery
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_ROOT_PASSWORD: orrery
+      MYSQL_USER: orrery
+    hostname: mysql
+    image: mysql:8.2
+    networks:
+      default: null
+    volumes:
+    - type: volume
+      source: mysqldata
+      target: /var/lib/mysql
+      volume: {}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - mysqladmin ping -h mysql -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      timeout: 10s
+      interval: 2s
+      retries: 5
+      start_period: 20s
+    ports:
+    - mode: ingress
+      target: 3306
+      published: '3306'
+      protocol: tcp
+  opensearch:
+    profiles:
+    - quickstart
+    - quickstart-backend
+    - quickstart-actions
+    - quickstart-frontend
+    - quickstart-storage
+    - quickstart-cassandra
+    - quickstart-postgres
+    - quickstart-postgres-consumers
+    - quickstart-postgres-cdc
+    - quickstart-consumers
+    - quickstart-consumers-cdc
+    - debug
+    - debug-min
+    - debug-orrery-actions
+    - debug-frontend
+    - debug-backend
+    - debug-postgres
+    - debug-postgres-cdc
+    - debug-postgres-consumers
+    - debug-cassandra
+    - debug-consumers
+    - debug-consumers-cdc
+    - debug-neo4j
+    - debug-backend-aws
+    - debug-aws
+    - debug-opensearch2
+    - quickstart-opensearch2
+    environment:
+      DISABLE_SECURITY_PLUGIN: 'true'
+      ES_JAVA_OPTS: -Xms256m -Xmx512m -Dlog4j2.formatMsgNoLookups=true
+      OPENSEARCH_JAVA_OPTS: -Xms768m -Xmx1024m -Dlog4j2.formatMsgNoLookups=true
+      discovery.type: single-node
+    hostname: search
+    image: opensearchproject/opensearch:2.19.3
+    networks:
+      default: null
+    volumes:
+    - type: volume
+      source: osdata
+      target: /usr/share/opensearch/data
+      volume: {}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -sS --fail "http://search:$${ORRERY_ELASTIC_PORT:-9200}/_cluster/health?wait_for_status=yellow&timeout=0s"
+      timeout: 15s
+      interval: 5s
+      retries: 10
+      start_period: 1m0s
+    ports:
+    - mode: ingress
+      target: 9200
+      published: '9200'
+      protocol: tcp
+  orrery-actions-quickstart:
+    profiles:
+    - quickstart
+    - quickstart-backend
+    - quickstart-opensearch2
+    environment:
+      ACTIONS_CONFIG: ''
+      ACTIONS_EXTRA_PACKAGES: ''
+      AWS_PROFILE: null
+      AWS_SDK_LOAD_CONFIG: '1'
+      ELASTICSEARCH_HOST: search
+      ELASTICSEARCH_PORT: '9200'
+      ELASTICSEARCH_PROTOCOL: http
+      ELASTICSEARCH_USE_SSL: 'false'
+      KAFKA_BOOTSTRAP_SERVER: broker:29092
+      KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      METADATA_AUDIT_EVENT_NAME: MetadataAuditEvent_v4
+      METADATA_CHANGE_LOG_VERSIONED_TOPIC_NAME: MetadataChangeLog_Versioned_v1
+      ORRERY_GMS_HOST: orrery-gms
+      ORRERY_GMS_PORT: '8080'
+      ORRERY_GMS_PROTOCOL: http
+      ORRERY_SYSTEM_CLIENT_ID: __orrery_system
+      ORRERY_SYSTEM_CLIENT_SECRET: JohnSnowKnowsNothing
+      SCHEMA_REGISTRY_URL: http://orrery-gms:8080/schema-registry/api/
+      UV_LINK_MODE: hardlink
+    hostname: actions
+    image: acryldata/orrery-actions:${ORRERY_VERSION}-slim
+    networks:
+      default: null
+    volumes:
+    - type: bind
+      source: ${HOME}/.aws
+      target: /home/orrery/.aws
+      read_only: true
+      bind:
+        create_host_path: true
+    - type: bind
+      source: ${HOME}/.aws/sso/cache
+      target: /home/orrery/.aws/sso/cache
+      bind:
+        create_host_path: true
+    depends_on:
+      orrery-gms-quickstart:
+        condition: service_healthy
+        required: true
+  orrery-gms-quickstart:
+    profiles:
+    - quickstart
+    - quickstart-backend
+    - quickstart-opensearch2
+    environment:
+      ALTERNATE_MCP_VALIDATION: 'true'
+      CONFIG_ENTITY_REGISTRY_USE_OPTIMIZED_LOADING: 'true'
+      DEV_TOOLING_ENABLED: 'false'
+      EBEAN_DATASOURCE_DRIVER: com.mysql.jdbc.Driver
+      EBEAN_DATASOURCE_HOST: mysql:3306
+      EBEAN_DATASOURCE_PASSWORD: orrery
+      EBEAN_DATASOURCE_URL: jdbc:mysql://mysql:3306/orrery?verifyServerCertificate=false&useSSL=true&useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true&enabledTLSProtocols=TLSv1.2
+      EBEAN_DATASOURCE_USERNAME: root
+      ELASTICSEARCH_HOST: search
+      ELASTICSEARCH_IMPLEMENTATION: opensearch
+      ELASTICSEARCH_INDEX_BUILDER_MAPPINGS_REINDEX: 'true'
+      ELASTICSEARCH_INDEX_BUILDER_SETTINGS_REINDEX: 'true'
+      ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS: '3'
+      ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS: '3'
+      ELASTICSEARCH_LIMIT_RESULTS_STRICT: 'true'
+      ELASTICSEARCH_PORT: '9200'
+      ELASTICSEARCH_PROTOCOL: http
+      ELASTICSEARCH_USE_SSL: 'false'
+      ENTITY_REGISTRY_CONFIG_PATH: /orrery/orrery-gms/resources/entity-registry.yml
+      ENTITY_SERVICE_ENABLE_RETENTION: 'true'
+      ENTITY_VERSIONING_ENABLED: 'true'
+      ES_BULK_REFRESH_POLICY: NONE
+      EXTRACT_JAR_ENABLED: 'true'
+      GMS_LIFECYCLE_TIMEOUT: 65s
+      GRAPH_SERVICE_DIFF_MODE_ENABLED: 'true'
+      GRAPH_SERVICE_IMPL: elasticsearch
+      GRAPHQL_SHAPE_LOGGING_DURATION_THRESHOLD_MS: '3000'
+      GRAPHQL_SHAPE_LOGGING_ENABLED: 'false'
+      GRAPHQL_SHAPE_LOGGING_ERROR_COUNT_THRESHOLD: '1'
+      GRAPHQL_SHAPE_LOGGING_FIELD_COUNT_THRESHOLD: '100'
+      GRAPHQL_SHAPE_LOGGING_RESPONSE_SIZE_THRESHOLD_BYTES: '1048576'
+      JAVA_OPTS: -Xms1g -Xmx1g -Dhazelcast.wait.seconds.before.join=0
+      KAFKA_BOOTSTRAP_SERVER: broker:29092
+      KAFKA_SCHEMAREGISTRY_URL: http://orrery-gms:8080/schema-registry/api/
+      LOG_AGGREGATOR_ENDPOINT: ''
+      MAE_CONSUMER_ENABLED: 'true'
+      MCE_CONSUMER_ENABLED: 'true'
+      MCL_CONSUMER_BATCH_ENABLED: 'true'
+      MCP_CONSUMER_BATCH_ENABLED: 'true'
+      METADATA_SERVICE_AUTH_ENABLED: 'false'
+      NEO4J_HOST: http://neo4j:7474
+      NEO4J_PASSWORD: orrery
+      NEO4J_URI: bolt://neo4j
+      NEO4J_USERNAME: neo4j
+      ORRERY_BASE_PATH: /
+      ORRERY_GMS_BASE_PATH: /
+      ORRERY_OBJECT_STORAGE_URI: file:///tmp/orrery-object-storage
+      ORRERY_SERVER_TYPE: quickstart
+      ORRERY_SYSTEM_CLIENT_SECRET: ${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}
+      ORRERY_TELEMETRY_ENABLED: 'false'
+      ORRERY_TOKEN_SERVICE_SALT: ${ORRERY_TOKEN_SERVICE_SALT}
+      ORRERY_TOKEN_SERVICE_SIGNING_KEY: ${ORRERY_TOKEN_SERVICE_SIGNING_KEY}
+      PE_CONSUMER_ENABLED: 'true'
+      POLICY_CACHE_REFRESH_INTERVAL_SECONDS: '120'
+      SCHEMA_REGISTRY_TYPE: INTERNAL
+      SEARCH_BAR_API_VARIANT: SEARCH_ACROSS_ENTITIES
+      SERVER_SHUTDOWN_MODE: immediate
+      SHOW_HAS_SIBLINGS_FILTER: 'true'
+      SHOW_HOME_PAGE_REDESIGN: 'true'
+      SHOW_SEARCH_BAR_AUTOCOMPLETE_REDESIGN: 'true'
+      STRICT_URN_VALIDATION_ENABLED: 'true'
+      THEME_V2_DEFAULT: 'true'
+      UI_INGESTION_ENABLED: 'true'
+      USAGE_AGGREGATION_ALIGNMENT_PERIOD_SECONDS: '3600'
+      USAGE_AGGREGATION_ENABLED: 'true'
+      USAGE_AGGREGATION_FLUSH_INTERVAL_SECONDS: '30'
+      USAGE_AGGREGATION_INCLUDE_AGENT_NAME: 'true'
+      VIEW_AUTHORIZATION_ENABLED: 'false'
+      ZDU_STAGE_10: 'true'
+      ZDU_STAGE_20: 'true'
+      UI_INGESTION_DEFAULT_CLI_VERSION: ${UI_INGESTION_DEFAULT_CLI_VERSION}
+    hostname: orrery-gms
+    image: acryldata/orrery-gms:${ORRERY_VERSION}
+    labels:
+      io.orreryproject.orrery.component: gms
+    networks:
+      default: null
+    volumes:
+    - type: bind
+      source: ${HOME}/.orrery/plugins
+      target: /etc/orrery/plugins
+      bind:
+        create_host_path: true
+    - type: bind
+      source: ${HOME}/.orrery/search
+      target: /etc/orrery/search
+      bind:
+        create_host_path: true
+    depends_on:
+      system-update-quickstart:
+        condition: service_completed_successfully
+        required: true
+    expose:
+    - '4319'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -sS --fail http://orrery-gms:8080/health
+      timeout: 5s
+      interval: 1s
+      retries: 3
+      start_period: 1m30s
+    ports:
+    - mode: ingress
+      target: 8080
+      published: ${ORRERY_MAPPED_GMS_PORT:-8080}
+      protocol: tcp
+    - mode: ingress
+      target: 4319
+      published: '4319'
+      protocol: tcp
+  system-update-quickstart:
+    profiles:
+    - quickstart
+    - quickstart-storage
+    - quickstart-consumers
+    - quickstart-frontend
+    - quickstart-backend
+    - quickstart-opensearch2
+    command:
+    - -u
+    - SystemUpdate
+    environment:
+      BACKFILL_BROWSE_PATHS_V2: 'true'
+      CREATE_USER: 'false'
+      CREATE_USER_PASSWORD: orrery
+      CREATE_USER_USERNAME: orrery
+      EBEAN_DATASOURCE_DRIVER: com.mysql.jdbc.Driver
+      EBEAN_DATASOURCE_HOST: mysql:3306
+      EBEAN_DATASOURCE_PASSWORD: orrery
+      EBEAN_DATASOURCE_URL: jdbc:mysql://mysql:3306/orrery?verifyServerCertificate=false&useSSL=true&useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true&enabledTLSProtocols=TLSv1.2
+      EBEAN_DATASOURCE_USERNAME: root
+      ELASTICSEARCH_BUILD_INDICES_CLONE_INDICES: 'false'
+      ELASTICSEARCH_HOST: search
+      ELASTICSEARCH_IMPLEMENTATION: opensearch
+      ELASTICSEARCH_INDEX_BUILDER_MAPPINGS_REINDEX: 'true'
+      ELASTICSEARCH_INDEX_BUILDER_REFRESH_INTERVAL_SECONDS: '3'
+      ELASTICSEARCH_INDEX_BUILDER_SETTINGS_REINDEX: 'true'
+      ELASTICSEARCH_INDEX_REFRESH_INTERVAL_TIMESERIES_SECONDS: '3'
+      ELASTICSEARCH_INDEX_REFRESH_INTERVAL_USAGE_SECONDS: '3'
+      ELASTICSEARCH_PORT: '9200'
+      ELASTICSEARCH_PROTOCOL: http
+      ELASTICSEARCH_USE_SSL: 'false'
+      ENTITY_REGISTRY_CONFIG_PATH: /orrery/orrery-gms/resources/entity-registry.yml
+      ENTITY_VERSIONING_ENABLED: 'true'
+      GRAPH_SERVICE_IMPL: elasticsearch
+      KAFKA_BOOTSTRAP_SERVER: broker:29092
+      KAFKA_SCHEMAREGISTRY_URL: http://orrery-gms:8080/schema-registry/api/
+      LOG_AGGREGATOR_ENDPOINT: ''
+      NEO4J_HOST: http://neo4j:7474
+      NEO4J_PASSWORD: orrery
+      NEO4J_URI: bolt://neo4j
+      NEO4J_USERNAME: neo4j
+      ORRERY_BASE_PATH: /
+      ORRERY_GMS_BASE_PATH: /
+      ORRERY_GMS_HOST: orrery-gms
+      ORRERY_GMS_PORT: '8080'
+      ORRERY_PRECREATE_TOPICS: 'true'
+      ORRERY_SQL_SETUP_ENABLED: 'true'
+      ORRERY_SYSTEM_CLIENT_SECRET: ${ORRERY_SYSTEM_CLIENT_SECRET:-JohnSnowKnowsNothing}
+      ORRERY_TOKEN_SERVICE_SALT: ${ORRERY_TOKEN_SERVICE_SALT}
+      ORRERY_TOKEN_SERVICE_SIGNING_KEY: ${ORRERY_TOKEN_SERVICE_SIGNING_KEY}
+      PARTITIONS: '3'
+      REPROCESS_DEFAULT_BROWSE_PATHS_V2: 'false'
+      SCHEMA_REGISTRY_SYSTEM_UPDATE: 'true'
+      SCHEMA_REGISTRY_TYPE: INTERNAL
+      SPRING_KAFKA_PROPERTIES_AUTO_REGISTER_SCHEMAS: 'true'
+      SPRING_KAFKA_PROPERTIES_USE_LATEST_VERSION: 'true'
+      USE_CONFLUENT_SCHEMA_REGISTRY: 'false'
+      VIEW_AUTHORIZATION_ENABLED: 'false'
+      ZDU_STAGE_10: 'true'
+      ZDU_STAGE_20: 'true'
+    hostname: orrery-system-update
+    image: acryldata/orrery-upgrade:${ORRERY_VERSION}
+    labels:
+      orrery_setup_job: 'true'
+    networks:
+      default: null
+    volumes:
+    - type: bind
+      source: ${HOME}/.orrery/plugins
+      target: /etc/orrery/plugins
+      bind:
+        create_host_path: true
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+        required: true
+      mysql:
+        condition: service_healthy
+        required: true
+      opensearch:
+        condition: service_healthy
+        required: true
+networks:
+  default:
+    name: orrery_network
+volumes:
+  broker:
+    name: orrery_broker
+  mysqldata:
+    name: orrery_mysqldata
+  osdata:
+    name: orrery_osdata

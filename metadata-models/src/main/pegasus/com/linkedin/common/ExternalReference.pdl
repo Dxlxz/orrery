@@ -1,0 +1,18 @@
+namespace com.linkedin.common
+
+/**
+ * A reference to an external platform.
+ */
+record ExternalReference {
+  /**
+   * URL where the reference exist
+   */
+  @Searchable = {
+    "fieldType": "KEYWORD",
+    "v3": {
+      "searchLabel": "externalUrl",
+      "queryByDefault": false
+    }
+  }
+  externalUrl: optional Url
+}

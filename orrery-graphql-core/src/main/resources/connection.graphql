@@ -1,0 +1,131 @@
+# Orrery Connections-specific GraphQL types
+
+extend type Query {
+  """
+  Get a set of connection details by URN.
+  This requires the 'Manage Connections' platform privilege.
+  Returns null if a connection with the provided urn does not exist.
+  """
+  connection(urn: String!): OrreryConnection
+}
+
+extend type Mutation {
+  """
+  Upsert a particular connection.
+  This requires the 'Manage Connections' platform privilege.
+  """
+  upsertConnection(input: UpsertOrreryConnectionInput!): OrreryConnection!
+}
+
+"""
+A connection between Orrery and an external Platform.
+"""
+type OrreryConnection implements Entity {
+  """
+  The urn of the connection
+  """
+  urn: String! @noAspects
+
+  """
+  The standard Entity Type field
+  """
+  type: EntityType! @noAspects
+
+  """
+  The connection details
+  """
+  details: OrreryConnectionDetails!
+    @aspectMapping(aspects: ["orreryConnectionDetails"])
+
+  """
+  The external Data Platform associated with the connection
+  """
+  platform: DataPlatform! @aspectMapping(aspects: ["dataPlatformInstance"])
+
+  """
+  Not implemented!
+  """
+  relationships(input: RelationshipsInput!): EntityRelationshipsResult
+    @noAspects
+}
+
+"""
+The details of the Connection
+"""
+type OrreryConnectionDetails {
+  """
+  The type or format of connection
+  """
+  type: OrreryConnectionDetailsType!
+
+  """
+  A JSON-encoded connection. Present when type is JSON.
+  """
+  json: OrreryJsonConnection
+
+  """
+  The name for this Orrery connection
+  """
+  name: String
+}
+
+"""
+The type of a Orrery connection
+"""
+enum OrreryConnectionDetailsType {
+  """
+  A json-encoded set of connection details.
+  """
+  JSON
+}
+
+"""
+The details of a JSON Connection
+"""
+type OrreryJsonConnection {
+  """
+  The JSON blob containing the specific connection details.
+  """
+  blob: String!
+}
+
+"""
+Input required to upsert a new Orrery connection.
+"""
+input UpsertOrreryConnectionInput {
+  """
+  An optional ID to use when creating the URN of the connection. If none is provided,
+  a random UUID will be generated automatically.
+  """
+  id: String
+
+  """
+  The type or format of connection
+  """
+  type: OrreryConnectionDetailsType!
+
+  """
+  Urn of the associated platform
+  """
+  platformUrn: String!
+
+  """
+  A JSON-encoded connection. This must be present when type is JSON.
+  """
+  json: OrreryJsonConnectionInput
+
+  """
+  An optional name for this connection entity
+  """
+  name: String
+}
+
+"""
+The details of a JSON Connection
+"""
+input OrreryJsonConnectionInput {
+  """
+  The JSON blob containing the specific connection details.
+  """
+  blob: String!
+}

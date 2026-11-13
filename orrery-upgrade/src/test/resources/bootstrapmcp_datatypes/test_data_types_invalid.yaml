@@ -1,0 +1,8 @@
+- entityUrn: urn:li:dataType:orrery.test
+  entityType: dataType
+  aspectName: dataTypeInfo
+  changeType: UPSERT
+  aspect:
+    badField:
+      qualifiedName: orrery.test
+      description: Test Description

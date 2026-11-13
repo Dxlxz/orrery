@@ -1,0 +1,4 @@
+org.springframework.test.context.ContextCustomizerFactory=\
+io.orreryproject.test.wiring.WiringCoverageContextCustomizerFactory
+org.springframework.context.ApplicationContextInitializer=\
+io.orreryproject.test.wiring.WiringCoverageInitializer

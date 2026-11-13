@@ -1,0 +1,15 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a OrreryFile
+ */
+@Aspect = {
+  "name": "orreryFileKey",
+}
+record OrreryFileKey {
+  /**
+  * Unique id for the file.
+  */
+  id: string
+}
+

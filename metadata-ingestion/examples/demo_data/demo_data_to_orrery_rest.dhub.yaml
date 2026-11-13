@@ -1,0 +1,8 @@
+source:
+  type: "demo-data"
+  config: {}
+
+sink:
+  type: "orrery-rest"
+  config:
+    server: 'http://localhost:8080'

@@ -1,0 +1,17 @@
+entities:
+  - name: orreryAccessToken
+    category: internal
+    keyAspect: orreryAccessTokenKey
+    aspects:
+      - orreryAccessTokenInfo
+  - name: corpuser
+    keyAspect: corpUserKey
+    aspects:
+      - corpUserInfo
+      - corpUserEditableInfo
+      - corpUserStatus
+      - groupMembership
+      - status
+      - corpUserCredentials
+      - corpUserSettings
+events:

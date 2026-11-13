@@ -1,0 +1,14 @@
+---
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/mssql for complete documentation
+source:
+  type: mssql
+  config:
+    username: sa
+    password: test!Password
+    database: DemoData
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

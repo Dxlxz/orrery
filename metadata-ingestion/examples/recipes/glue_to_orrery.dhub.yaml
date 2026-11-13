@@ -1,0 +1,12 @@
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/glue for complete documentation
+source:
+  type: glue
+  config:
+    aws_region: "us-west-2"
+    extract_transforms: true
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

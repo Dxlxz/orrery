@@ -1,0 +1,8 @@
+namespace com.linkedin.retention
+
+@Aspect = {
+  "name": "orreryRetentionConfig"
+}
+record OrreryRetentionConfig {
+  retention: Retention
+}

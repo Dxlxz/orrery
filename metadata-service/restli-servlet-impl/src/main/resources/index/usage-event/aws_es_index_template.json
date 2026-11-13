@@ -1,0 +1,33 @@
+{
+  "index_patterns": ["PREFIXorrery_usage_event-*"],
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "type": {
+        "type": "keyword"
+      },
+      "timestamp": {
+        "type": "date"
+      },
+      "userAgent": {
+        "type": "keyword"
+      },
+      "browserId": {
+        "type": "keyword"
+      },
+      "language": {
+        "type": "keyword"
+      },
+      "appLanguage": {
+        "type": "keyword"
+      }
+    }
+  },
+  "settings": {
+    "index.opendistro.index_state_management.rollover_alias": "PREFIXorrery_usage_event",
+    "index.number_of_shards": DUE_SHARDS,
+    "index.number_of_replicas": DUE_REPLICAS
+  }
+}

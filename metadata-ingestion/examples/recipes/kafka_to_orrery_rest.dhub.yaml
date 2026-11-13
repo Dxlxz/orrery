@@ -1,0 +1,13 @@
+---
+# see https://docs.orrery.dev/docs/generated/ingestion/sources/kafka for complete documentation
+source:
+  type: "kafka"
+  config:
+    connection:
+      bootstrap: "localhost:9092"
+
+# see https://docs.orrery.dev/docs/metadata-ingestion/sink_docs/orrery for complete documentation
+sink:
+  type: "orrery-rest"
+  config:
+    server: "http://localhost:8080"

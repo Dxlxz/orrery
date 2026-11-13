@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a OrreryPageTemplate
+ */
+@Aspect = {
+  "name": "orreryPageTemplateKey",
+}
+record OrreryPageTemplateKey {
+  /**
+  * Unique id for the template.
+  */
+  id: string
+}

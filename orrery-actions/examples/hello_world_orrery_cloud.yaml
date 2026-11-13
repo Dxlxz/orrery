@@ -1,0 +1,13 @@
+# hello_world.yaml
+name: "hello_world_orrery_cloud"
+# 1. Orrery Cloud Connection: Configure how to talk to Orrery Cloud
+orrery:
+  server: "https://<your-organization>.orrery.dev"
+  token: "<your-orrery-cloud-token>"
+# 2. Event Source: Where to source event from.
+source:
+  type: "orrery-cloud"
+# 3. Action: What action to take on events. 
+# To learn how to develop a custom Action, see https://docs.orrery.dev/docs/actions/guides/developing-an-action	
+action:
+  type: "hello_world"

@@ -1,0 +1,188 @@
+namespace com.orrery.test
+
+import com.linkedin.common.Urn
+import com.linkedin.common.CustomProperties
+
+/**
+ * Info associated with a Test Entity
+ */
+@Aspect = {
+  "name": "testEntityInfo",
+  "schemaVersion": 3
+}
+record TestEntityInfo includes CustomProperties {
+
+  @Searchable = {
+    "fieldName": "textFieldOverride",
+    "fieldType": "TEXT",
+    "addToFilters": true,
+    "fieldNameAliases": [ "_entityName" ],
+    "includeQueryEmptyAggregation": true,
+    "v3": {
+      "queryByDefault": true,
+      "searchLabel": "name"
+    }
+  }
+  textField: optional string
+
+  @Searchable = {
+   "/*": {
+     "v3": {
+       "queryByDefault": true
+     },
+    "fieldType": "TEXT_PARTIAL"
+   }
+  }
+  textArrayField: optional array[string]
+
+  @Searchable = {
+    "v3": {
+      "queryByDefault": true
+    },
+    "fieldType": "WORD_GRAM"
+  }
+  wordGramField: optional string
+
+  @Relationship = {
+    "name": "foreignKey",
+    "entityTypes": []
+  }
+  @Searchable = {
+    "fieldType": "URN"
+  }
+  foreignKey: optional Urn
+
+  @Relationship = {
+    "/*": {
+      "name": "foreignKeyArray",
+      "entityTypes": []
+    }
+  }
+  foreignKeyArray: optional array[Urn]
+
+  nestedRecordField: optional record SimpleNestedRecord1 {
+    @Searchable = {
+      "fieldType": "COUNT"
+    }
+    nestedIntegerField: optional int
+
+    @Relationship = {
+      "name": "nestedForeignKey",
+      "entityTypes": []
+    }
+    @Searchable = {
+      "fieldType": "URN_PARTIAL"
+    }
+    nestedForeignKey: optional Urn
+  }
+
+  nestedRecordArrayField: optional array[record SimpleNestedRecord2 {
+    @Searchable = {
+      "v3": {
+        "queryByDefault": true
+      },
+     "fieldType": "TEXT"
+    }
+    nestedArrayStringField: optional string
+
+    @Relationship = {
+      "name": "nestedArrayForeignKey",
+      "entityTypes": []
+    }
+    nestedArrayForeignKey: optional Urn
+
+    @Searchable = {
+      "/*": {
+        "v3": {
+          "queryByDefault": true
+        }
+      }
+    }
+    nestedArrayArrayField: optional array[string]
+  }]
+
+  @Searchable = {
+    "/*": {
+      "v3": {
+        "queryByDefault": true
+      },
+      "name": "esObjectField",
+      "fieldType": "OBJECT",
+      "queryByDefault": true
+    }
+  }
+  esObjectField: optional map[string, string]
+
+  @Searchable = {
+     "fieldName": "doubleField",
+     "fieldType": "DOUBLE"
+  }
+  doubleField: optional double
+
+  @Searchable = {
+     "fieldName": "removed",
+     "fieldType": "BOOLEAN"
+  }
+  removed: optional boolean
+
+   @Searchable = {
+      "/*": {
+        "v3": {
+          "queryByDefault": true
+        },
+        "name": "esObjectFieldLong",
+        "fieldType": "OBJECT",
+        "queryByDefault": true
+     }
+  }
+  esObjectFieldLong: optional map[string, long]
+
+   @Searchable = {
+      "/*": {
+        "v3": {
+          "queryByDefault": true
+        },
+          "name": "esObjectFieldBoolean",
+          "fieldType": "OBJECT",
+          "queryByDefault": true
+      }
+  }
+  esObjectFieldBoolean: optional map[string, boolean]
+
+  @Searchable = {
+      "/*": {
+        "v3": {
+          "queryByDefault": true
+        },
+        "name": "esObjectFieldFloat",
+        "fieldType": "OBJECT",
+        "queryByDefault": true
+    }
+  }
+  esObjectFieldFloat: optional map[string, float]
+
+  @Searchable = {
+       "/*": {
+         "v3": {
+           "queryByDefault": true
+         },
+        "name": "esObjectFieldDouble",
+        "fieldType": "OBJECT",
+        "queryByDefault": true
+     }
+  }
+  esObjectFieldDouble: optional map[string, double]
+
+  @Searchable = {
+      "/*": {
+        "v3": {
+          "queryByDefault": true
+        },
+        "name": "esObjectFieldInteger",
+        "fieldType": "OBJECT",
+        "queryByDefault": true
+      }
+  }
+  esObjectFieldInteger: optional map[string, int]
+
+}

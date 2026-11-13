@@ -1,0 +1,30 @@
+[
+    {
+        "@odata.type": "#microsoft.graph.user",
+        "displayName": "John Green",
+        "surname": "Green",
+        "givenName": "John",
+        "id": "fa379b0d5435ef74",
+        "userPrincipalName": "johngreen@orrery.dev",
+        "businessPhones": [],
+        "jobTitle": null,
+        "mail": "johngreen@orrery.dev",
+        "mobilePhone": null,
+        "officeLocation": null,
+        "preferredLanguage": null
+    },
+    {
+        "@odata.type": "#microsoft.graph.user",
+        "displayName": "Adam Hall",
+        "surname": "Hall",
+        "givenName": "Adam",
+        "id": "fa379b0d5435ef74",
+        "userPrincipalName": "adamhall@orrery.dev",
+        "businessPhones": [],
+        "jobTitle": null,
+        "mail": "adamhall@orrery.dev",
+        "mobilePhone": null,
+        "officeLocation": null,
+        "preferredLanguage": null
+    }
+]

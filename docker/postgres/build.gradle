@@ -1,0 +1,30 @@
+// Image lifecycle is independent of the Orrery application version (see publish-orrery-postgres workflow).
+apply from: "../../gradle/docker/docker.gradle"
+
+ext {
+    docker_registry = rootProject.ext.docker_registry == 'linkedin' ? 'dxlxz' : docker_registry
+    docker_repo = 'orrery-postgres'
+    docker_dir = 'postgres'
+    orreryPostgresImageTag = project.findProperty('orreryPostgresImageTag') ?: '17.5-extensions-v1'
+}
+
+docker {
+    name "${docker_registry}/${docker_repo}:${orreryPostgresImageTag}"
+    dockerfile file("${rootProject.projectDir}/docker/${docker_dir}/Dockerfile")
+    files fileTree(rootProject.projectDir) {
+        include '.dockerignore'
+        include "docker/${docker_dir}/**"
+    }.exclude {
+        i -> (!i.file.name.endsWith(".dockerignore") && i.file.isHidden())
+    }
+    additionalTag("Debug", "${docker_registry}/${docker_repo}:debug")
+
+    def dockerBuildArgs = [:]
+    if (project.hasProperty('postgresVersion')) {
+        dockerBuildArgs.POSTGRES_VERSION = project.getProperty('postgresVersion')
+    }
+
+    if (dockerBuildArgs.size() > 0) {
+        buildArgs(dockerBuildArgs)
+    }
+}

@@ -1,0 +1,73 @@
+---
+title: "Orrery Authentication Overview"
+---
+
+# Overview
+
+Authentication is the process of verifying the identity of a user or service. There are two
+places where Authentication occurs inside Orrery:
+
+1. Orrery frontend service when a user attempts to log in to the Orrery application.
+2. Orrery backend service when making API requests to Orrery.
+
+In this document, we'll tak a closer look at both.
+
+### Authentication in the Frontend
+
+Authentication of normal users of Orrery takes place in two phases.
+
+At login time, authentication is performed by either Orrery itself (via username / password entry) or a third-party Identity Provider. Once the identity
+of the user has been established, and credentials validated, a persistent session token is generated for the user and stored
+in a browser-side session cookie.
+
+Orrery provides 3 mechanisms for authentication at login time:
+
+- **Native Authentication** which uses username and password combinations natively stored and managed by Orrery, with users invited via an invite link.
+- [Single Sign-On with OpenID Connect](guides/sso/configure-oidc-react.md) to delegate authentication responsibility to third party systems like Okta or Google/Azure Authentication. This is the recommended approach for production systems.
+- [JaaS Authentication](guides/jaas.md) for simple deployments where authenticated users are part of some known list or invited as a [Native Orrery User](guides/add-users.md).
+
+In subsequent requests, the session token is used to represent the authenticated identity of the user, and is validated by Orrery's backend service (discussed below).
+Eventually, the session token is expired (24 hours by default), at which point the end user is required to log in again.
+
+Orrery also supports Guest users to access the system without requiring an explicit login when enabled. The default configuration disables guest authentication.
+When Guest access is enabled, accessing orrery with a configurable URL path logs the user in an existing user that is designated as the guest. The privileges of the guest user
+are controlled by adjusting privileges of that designated guest user.
+
+### Authentication in the Backend (Metadata Service)
+
+When a user makes a request for Data within Orrery, the request is authenticated by Orrery's Backend (Metadata Service) via a JSON Web Token. This applies to both requests originating from the Orrery application,
+and programmatic calls to Orrery APIs. There are two types of tokens that are important:
+
+1. **Session Tokens**: Generated for users of the Orrery web application. By default, having a duration of 24 hours.
+   These tokens are encoded and stored inside browser-side session cookies. The duration a session token is valid for is configurable via the `MAX_SESSION_TOKEN_AGE` environment variable
+   on the orrery-frontend deployment. Additionally, the `AUTH_SESSION_TTL_HOURS` configures the expiration time of the actor cookie on the user's browser which will also prompt a user login. The difference between these is that the actor cookie expiration only affects the browser session and can still be used programmatically,
+   but when the session expires it can no longer be used programmatically either as it is created as a JWT with an expiration claim.
+2. **Personal Access Tokens**: These are tokens generated via the Orrery settings panel useful for interacting
+   with Orrery APIs. They can be used to automate processes like enriching documentation, ownership, tags, and more on Orrery. Learn
+   more about Personal Access Tokens [here](personal-access-tokens.md).
+3. **OAuth Provider Tokens**: JWT tokens issued by external OAuth2/OIDC providers (like Okta, Auth0, Azure AD) can be used
+   for service-to-service authentication. This enables seamless integration with existing OAuth infrastructure and is ideal
+   for automated services and applications. Learn more about OAuth Provider authentication [here](external-oauth-providers.md).
+
+To learn more about Orrery's backend authentication, check out [Introducing Metadata Service Authentication](introducing-metadata-service-authentication.md).
+
+Credentials must be provided as Bearer Tokens inside of the **Authorization** header in any request made to Orrery's API layer.
+
+```shell
+Authorization: Bearer <your-token>
+```
+
+As with the frontend, the backend also can optionally enable Guest authentication. If Guest authentication is enabled, all API calls made to the backend
+without an Authorization header are treated as guest users and the privileges associated with the designated guest user apply to those requests.
+
+Note that in Orrery local quickstarts, Authentication at the backend layer is disabled for convenience. This leaves the backend
+vulnerable to unauthenticated requests and should not be used in production. To enable
+backend (token-based) authentication, simply set the `METADATA_SERVICE_AUTH_ENABLED=true` environment variable
+for the orrery-gms container or pod.
+
+It is also recommended to provide your own values for `ORRERY_TOKEN_SERVICE_SIGNING_KEY` and `ORRERY_TOKEN_SERVICE_SALT` which is used to sign and verify the access tokens generated by the application. Note that starting v1.5.0 the default values for the above have been removed from the code.
+
+### References
+
+For a quick video on the topic of users and groups within Orrery, have a look at [Orrery Basics — Users, Groups, & Authentication 101
+](https://youtu.be/8Osw6p9vDYY)

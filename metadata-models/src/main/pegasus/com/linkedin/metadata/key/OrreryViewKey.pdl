@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Orrery View
+ */
+@Aspect = {
+  "name": "orreryViewKey"
+}
+record OrreryViewKey {
+  /**
+   * A unique id for the View
+   */
+  id: string
+}

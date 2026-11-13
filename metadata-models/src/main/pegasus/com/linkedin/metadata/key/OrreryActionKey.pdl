@@ -1,0 +1,14 @@
+namespace com.linkedin.metadata.key
+
+/**
+ * Key for a Orrery Action Pipeline
+ */
+@Aspect = {
+  "name": "orreryActionKey"
+}
+record OrreryActionKey {
+  /**
+   * A unique id for the Action, either generated or provided
+   */
+  id: string
+}

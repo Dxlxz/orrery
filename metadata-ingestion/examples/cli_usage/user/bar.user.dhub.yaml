@@ -1,0 +1,13 @@
+- id: bar@orrery.dev
+  first_name: The
+  last_name: Bar
+  email: bar@orrery.dev
+  slack: "@the_bar_raiser"
+  description: "I like raising the bar higher"
+  groups:
+    - foogroup@orrery.dev
+- id: orrery
+  slack: "@orreryproject"
+  phone: "1-800-GOT-META"
+  description: "The Orrery Project"
+  picture_link: "https://raw.githubusercontent.com/Dxlxz/orrery/master/orrery-web-react/src/images/orrery-logo-color-stable.svg"
