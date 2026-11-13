@@ -113,7 +113,7 @@ jobs:
       # images that run built rather than look for a branch tag in the registry.
       - name: Set up Depot CLI
         if: ${{ !inputs.pull_from_registry && inputs.depot_build_id != '' }}
-        uses: depot/setup-action@15c09a5f77a0840ad4bce955686522a257853461 # v1
+        uses: depot/setup-action@91bc8495a33ebfc504ffc89e5674379ccf23c29c # v1
 
       - name: Pull images from depot
         if: ${{ !inputs.pull_from_registry && inputs.depot_build_id != '' }}
