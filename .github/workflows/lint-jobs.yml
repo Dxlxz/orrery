@@ -45,7 +45,7 @@ jobs:
       default-gh-runner: ${{ steps.runners.outputs.default-gh-runner }}
     steps:
       - uses: dxlxz/sane-checkout-action@186e92cc5948a9c3e1cc7a96eaff9f776f3fc8e3 # v7
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: .github/path-filters/lint-jobs-filters.yml
