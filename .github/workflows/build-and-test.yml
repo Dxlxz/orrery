@@ -215,7 +215,7 @@ jobs:
         uses: ./.github/actions/ensure-codegen-updated
       - name: Upload backend coverage to Codecov
         if: ${{ github.event_name != 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ env.BACKEND_FILES }}
@@ -227,7 +227,7 @@ jobs:
           verbose: true
       - name: Upload backend coverage to Codecov on release
         if: ${{ github.event_name == 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ env.BACKEND_FILES }}
@@ -240,13 +240,13 @@ jobs:
           override_branch: ${{ github.head_ref || github.ref_name }}
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.event_name != 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
       - name: Upload test results to Codecov on release
         if: ${{ !cancelled() && github.event_name == 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
@@ -321,7 +321,7 @@ jobs:
       # that step's `git status --porcelain` check would report as uncommitted changes.
       - name: Upload orrery-frontend Java coverage to Codecov
         if: ${{ !cancelled() && github.event_name != 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./build/coverage-reports/orrery-frontend/jacoco-orrery-frontend.xml
@@ -332,7 +332,7 @@ jobs:
           verbose: true
       - name: Upload orrery-frontend Java coverage to Codecov on Release
         if: ${{ !cancelled() && github.event_name == 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./build/coverage-reports/orrery-frontend/jacoco-orrery-frontend.xml
@@ -444,7 +444,7 @@ jobs:
           rm -rf "$TEMP_DIR"
       - name: Upload frontend coverage to Codecov
         if: ${{ github.event_name != 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ env.FRONTEND_FILES }}
@@ -456,7 +456,7 @@ jobs:
           verbose: true
       - name: Upload frontend coverage to Codecov on Release
         if: ${{ github.event_name == 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ env.FRONTEND_FILES }}
@@ -469,13 +469,13 @@ jobs:
           override_branch: ${{ github.head_ref || github.ref_name }}
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.event_name != 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
       - name: Upload test results to Codecov on release
         if: ${{ !cancelled() && github.event_name == 'release' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
@@ -699,7 +699,7 @@ jobs:
             **/build/jacoco/*.exec
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
@@ -763,7 +763,7 @@ jobs:
       # PRs. (The merge above still runs best-effort so the report exists for debugging.)
       - name: Upload backend coverage to Codecov
         if: ${{ needs.backend-test-shard.result == 'success' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ env.BACKEND_FILES }}
